@@ -22,7 +22,7 @@
 		"format": "prettier --write .",
 		"db:push": "drizzle-kit push",
 		"db:generate": "drizzle-kit generate",
-		"db:migrate": "drizzle-kit migrate",
+		"db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
 		"db:studio": "drizzle-kit studio",
 		"db:sample": "node --env-file=.env scripts/sample-data.mjs",
 		"db:sample:clear": "node --env-file=.env scripts/sample-data.mjs --clear",

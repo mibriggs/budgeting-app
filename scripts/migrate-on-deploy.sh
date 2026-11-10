@@ -17,10 +17,10 @@ environment="${VERCEL_ENV:-local}"
 
 if [ "$environment" = "production" ] || [ "${MIGRATE_ON_DEPLOY:-}" = "true" ]; then
 	echo "migrate-on-deploy: applying migrations ($environment)"
-	# drizzle-kit can exit non-zero without saying why (e.g. it can't reach the database).
-	if ! npx drizzle-kit migrate; then
+	# scripts/migrate.mjs rather than `drizzle-kit migrate`, which can fail without saying why.
+	if ! node scripts/migrate.mjs; then
 		echo "" >&2
-		echo "migrate-on-deploy: migrations FAILED, so this deployment was stopped." >&2
+		echo "migrate-on-deploy: migrations FAILED (error above), so this deployment was stopped." >&2
 		echo "  Check DATABASE_URL and DATABASE_AUTH_TOKEN for the $environment environment in Vercel," >&2
 		echo "  then try a local run against the same database: DATABASE_URL=… DATABASE_AUTH_TOKEN=… npm run db:migrate" >&2
 		exit 1
