@@ -67,3 +67,37 @@ export async function deleteTransactions(userId: string, kind: TransactionKind, 
 		.returning({ id: table.id });
 	return deleted.map((row) => row.id);
 }
+
+export type NewTransaction = {
+	name: string;
+	date: PlainDate;
+	amountCents: number;
+	categoryId: string;
+	notes: string | null;
+};
+
+/** Adds an expense or income row for the user. Inputs must already be validated. Returns its ID. */
+export async function createTransaction(
+	userId: string,
+	kind: TransactionKind,
+	input: NewTransaction
+) {
+	const base = {
+		userId,
+		name: input.name,
+		amountCents: input.amountCents,
+		categoryId: input.categoryId,
+		notes: input.notes
+	};
+	const [row] =
+		kind === 'expense'
+			? await db
+					.insert(expense)
+					.values({ ...base, purchaseDate: input.date })
+					.returning({ id: expense.id })
+			: await db
+					.insert(income)
+					.values({ ...base, receivedDate: input.date })
+					.returning({ id: income.id });
+	return row.id;
+}

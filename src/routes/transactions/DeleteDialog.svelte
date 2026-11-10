@@ -5,6 +5,7 @@
 -->
 <script lang="ts">
 	import { AlertDialog } from 'bits-ui';
+	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import type { TransactionKind } from '#lib/server/budget/transactions.ts';
@@ -40,12 +41,14 @@
 	// Keep the current range and tab in the URL; `/delete` picks the form action.
 	let action = $derived(`${page.url.search ? `${page.url.search}&` : '?'}/delete`);
 
-	function onOpenChange(isOpen: boolean) {
-		if (isOpen) error = '';
-	}
+	// Clear an old error each time the dialog opens. An effect, because Bits' onOpenChange doesn't
+	// fire when the page opens the dialog by setting `open = true`.
+	$effect(() => {
+		if (open) untrack(() => (error = ''));
+	});
 </script>
 
-<AlertDialog.Root bind:open {onOpenChange}>
+<AlertDialog.Root bind:open>
 	<AlertDialog.Portal>
 		<AlertDialog.Overlay class="fixed inset-0 z-50 bg-black/40" />
 		<AlertDialog.Content

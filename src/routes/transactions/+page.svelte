@@ -6,11 +6,14 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { formatRange } from '#lib/date-range.ts';
+	import Plus from '@lucide/svelte/icons/plus';
+	import { Temporal, type PlainDate } from '#lib/dates.ts';
+	import { formatDate, formatRange } from '#lib/date-range.ts';
 	import { createMediaQuery, WIDE_SCREEN } from '#lib/media.svelte.ts';
 	import { formatCents } from '#lib/money.ts';
 	import { updateQuery } from '#lib/url.ts';
 	import type { TransactionKind, TransactionRow } from '#lib/server/budget/transactions.ts';
+	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
 	import DeleteDialog from './DeleteDialog.svelte';
 	import RangePicker from './RangePicker.svelte';
 	import TransactionList from './TransactionList.svelte';
@@ -55,7 +58,8 @@
 	// Deleting: the dialog confirms first, so nothing is removed by a single click.
 	let pendingDelete = $state<{ kind: TransactionKind; ids: string[] } | null>(null);
 	let dialogOpen = $state(false);
-	let status = $state('');
+	// Short confirmation ("Deleted 3 expenses.") shown in the tab it applies to.
+	let status = $state<{ kind: TransactionKind; message: string } | null>(null);
 	let statusTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function confirmDelete(kind: TransactionKind, ids: string[]) {
@@ -72,9 +76,35 @@
 
 		const [one, many] =
 			kind === 'expense' ? ['expense', 'expenses'] : ['income entry', 'income entries'];
-		status = `Deleted ${count} ${count === 1 ? one : many}.`;
+		showStatus(kind, `Deleted ${count} ${count === 1 ? one : many}.`);
+	}
+
+	function showStatus(kind: TransactionKind, message: string) {
+		status = { kind, message };
 		clearTimeout(statusTimer);
-		statusTimer = setTimeout(() => (status = ''), 5000);
+		statusTimer = setTimeout(() => (status = null), 6000);
+	}
+
+	// Adding: one dialog, opened for whichever tab's button was pressed.
+	let addKind = $state<TransactionKind>('expense');
+	let addOpen = $state(false);
+
+	function openAdd(kind: TransactionKind) {
+		addKind = kind;
+		addOpen = true;
+	}
+
+	function onCreated({ name, date }: { name: string; date: PlainDate }) {
+		const inRange =
+			Temporal.PlainDate.compare(date, data.range.from) >= 0 &&
+			Temporal.PlainDate.compare(date, data.range.to) <= 0;
+		// Otherwise the new row wouldn't appear, and it would look like nothing happened.
+		showStatus(
+			addKind,
+			inRange
+				? `Added “${name}”.`
+				: `Added “${name}” on ${formatDate(date)}, outside the dates you’re viewing.`
+		);
 	}
 
 	function selectTab(value: string) {
@@ -88,16 +118,30 @@
 	<title>Transactions · Budget</title>
 </svelte:head>
 
+{#snippet addButton(kind: TransactionKind)}
+	<button
+		type="button"
+		class="flex items-center gap-1.5 rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+		onclick={() => openAdd(kind)}
+	>
+		<Plus class="size-4" aria-hidden="true" />
+		Add {kind === 'expense' ? 'expense' : 'income'}
+	</button>
+{/snippet}
+
 {#snippet table(rows: TransactionRow[], kind: TransactionKind)}
 	{@const label = kind === 'income' ? 'Income' : 'Expenses'}
 	{@const selected = selections[kind]}
 	{#if rows.length === 0}
-		<p
-			class="rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700"
+		<div
+			class="flex flex-col items-center gap-3 rounded-md border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-gray-700"
 		>
-			No {label.toLowerCase()} from {rangeLabel}.
-		</p>
-		{#if status}<p class="mt-2 text-sm text-gray-500" role="status">{status}</p>{/if}
+			<p>No {label.toLowerCase()} from {rangeLabel}.</p>
+			{@render addButton(kind)}
+		</div>
+		{#if status?.kind === kind}<p class="mt-2 text-sm text-gray-500" role="status">
+				{status.message}
+			</p>{/if}
 	{:else}
 		<div class="flex h-full flex-col gap-2">
 			<!-- Selection bar. Sticks to the top on phones, where the page itself scrolls. -->
@@ -127,8 +171,8 @@
 				<p class="text-gray-500" aria-live="polite">
 					{#if selected.size > 0}
 						<span class="font-medium text-gray-900 dark:text-gray-100">{selected.size}</span> selected
-					{:else if status}
-						{status}
+					{:else if status?.kind === kind}
+						{status.message}
 					{:else}
 						<span class="hidden sm:inline"
 							>Tick rows to select them. Shift-click selects a range.</span
@@ -154,6 +198,8 @@
 							Delete
 						</button>
 					</div>
+				{:else if !selecting}
+					<div class="ml-auto">{@render addButton(kind)}</div>
 				{/if}
 			</div>
 
@@ -225,6 +271,14 @@
 		</Tabs.Content>
 	</Tabs.Root>
 </main>
+
+<AddTransactionDialog
+	bind:open={addOpen}
+	kind={addKind}
+	categories={data.categories[addKind]}
+	today={data.today}
+	{onCreated}
+/>
 
 {#if pendingDelete}
 	<DeleteDialog
