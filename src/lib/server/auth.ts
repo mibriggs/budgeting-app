@@ -10,6 +10,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { sveltekitCookies } from 'better-auth/svelte-kit';
 import { getRequestEvent } from '$app/server';
 import { db } from '#lib/server/db/index.ts';
+import { createDefaultCategories } from '#lib/server/budget/defaults.ts';
 
 export const auth = betterAuth({
 	baseURL: ORIGIN,
@@ -19,7 +20,19 @@ export const auth = betterAuth({
 	user: {
 		additionalFields: {
 			// GitHub login handle (e.g. "octocat"). `name` holds the display name instead.
-			username: { type: 'string', required: false, input: false }
+			username: { type: 'string', required: false, input: false },
+			// IANA time zone (e.g. "America/New_York") used for "today" and "this month".
+			// Unset until the app records it from the browser.
+			timezone: { type: 'string', required: false, input: false }
+		}
+	},
+	databaseHooks: {
+		user: {
+			create: {
+				after: async (user) => {
+					await createDefaultCategories(user.id);
+				}
+			}
 		}
 	},
 	socialProviders: {
