@@ -12,7 +12,19 @@ export const variables = defineEnvVars({
 		schema: (value) => value || undefined
 	},
 	ORIGIN: {
-		description: 'The app origin (base URL), e.g. `http://localhost:5173`.'
+		description:
+			'The app origin, e.g. `https://centjar.vercel.app` or `http://localhost:5173`. Unset means "use the request\'s own origin".',
+		// Reduced to a bare origin: Better Auth matches `/api/auth/*` by concatenating ORIGIN and
+		// "/api/auth" as written, so a trailing slash ("…app/") makes every auth route 404.
+		schema: (value) => {
+			const trimmed = value?.trim();
+			if (!trimmed) return undefined;
+			try {
+				return new URL(trimmed).origin;
+			} catch {
+				throw new Error(`ORIGIN must be a URL like https://centjar.vercel.app (got "${trimmed}")`);
+			}
+		}
 	},
 	BETTER_AUTH_SECRET: {
 		description:
