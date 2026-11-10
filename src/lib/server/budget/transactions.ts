@@ -1,4 +1,4 @@
-import { and, between, desc, eq } from 'drizzle-orm';
+import { and, between, desc, eq, inArray } from 'drizzle-orm';
 import type { PlainDate } from '#lib/dates.ts';
 import { db } from '#lib/server/db/index.ts';
 import { expense, expenseCategory, income, incomeCategory } from '#lib/server/db/schema.ts';
@@ -48,3 +48,22 @@ export function listIncome(userId: string, { from, to }: Range) {
 }
 
 export type TransactionRow = Awaited<ReturnType<typeof listExpenses>>[number];
+
+export type TransactionKind = 'expense' | 'income';
+
+/** Most rows one delete request may remove. */
+export const MAX_DELETE = 5000;
+
+/**
+ * Permanently deletes the given expenses or income rows. Only rows owned by `userId` are
+ * touched; IDs that don't exist or belong to someone else are ignored. Returns the IDs deleted.
+ */
+export async function deleteTransactions(userId: string, kind: TransactionKind, ids: string[]) {
+	if (ids.length === 0) return [];
+	const table = kind === 'expense' ? expense : income;
+	const deleted = await db
+		.delete(table)
+		.where(and(eq(table.userId, userId), inArray(table.id, ids)))
+		.returning({ id: table.id });
+	return deleted.map((row) => row.id);
+}

@@ -3,9 +3,12 @@
 	Compact transaction rows for small screens:
 	[icon] 01/31/2026  Name  $Amount  [⋯]
 	The ⋯ button expands the row to show the full name, category and notes.
+	Virtualized against the page scroll: only rows near the screen are rendered, and each
+	row is measured so expanded rows push the ones below down.
 -->
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import Trash from '@lucide/svelte/icons/trash';
 	import { cubicOut } from 'svelte/easing';
 	import { prefersReducedMotion } from 'svelte/motion';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -14,8 +17,30 @@
 	import { formatNumericDate } from '#lib/date-range.ts';
 	import { formatCents } from '#lib/money.ts';
 	import type { TransactionRow } from '#lib/server/budget/transactions.ts';
+	import { createWindowVirtualizer } from '#lib/virtualizer.svelte.ts';
 
-	let { rows }: { rows: TransactionRow[] } = $props();
+	let {
+		rows,
+		selected,
+		selecting = false,
+		onDelete,
+		active = true
+	}: {
+		rows: TransactionRow[];
+		/** IDs of ticked rows. Shared with the page, which owns deleting them. */
+		selected: SvelteSet<string>;
+		/** Show a checkbox on every row. */
+		selecting?: boolean;
+		/** Asks the page to confirm and delete these rows (the details' Delete button). */
+		onDelete: (ids: string[]) => void;
+		/** False while hidden by CSS: hidden rows measure 0px tall, so all of them would render. */
+		active?: boolean;
+	} = $props();
+
+	function toggleSelected(id: string) {
+		if (selected.has(id)) selected.delete(id);
+		else selected.add(id);
+	}
 
 	const expanded = new SvelteSet<string>();
 
@@ -26,16 +51,69 @@
 		if (expanded.has(id)) expanded.delete(id);
 		else expanded.add(id);
 	}
+
+	// Rows scroll with the page, so the virtualizer needs to know where the list starts.
+	let list = $state<HTMLUListElement | null>(null);
+	let scrollMargin = $state(0);
+	$effect(() => {
+		if (!list) return;
+		const element = list;
+		const update = () => (scrollMargin = element.getBoundingClientRect().top + window.scrollY);
+		update();
+		// Content above the list (totals, error messages) can change height.
+		const observer = new ResizeObserver(update);
+		observer.observe(document.body);
+		return () => observer.disconnect();
+	});
+
+	const virtualizer = createWindowVirtualizer<HTMLLIElement>(() => ({
+		count: rows.length,
+		estimateSize: () => 49,
+		getItemKey: (index) => rows[index].id,
+		scrollMargin,
+		overscan: 8,
+		enabled: active,
+		// Lets the server render the first screenful before the real size is known.
+		initialRect: { width: 375, height: 800 }
+	}));
 </script>
 
+<!-- A spacer as tall as every row; only rows near the screen are rendered inside it. -->
 <ul
-	class="divide-y divide-gray-100 rounded-md border border-gray-200 dark:divide-gray-800 dark:border-gray-800"
+	bind:this={list}
+	class="relative overflow-hidden rounded-md border border-gray-200 dark:border-gray-800"
+	style:height="{virtualizer.totalSize}px"
 >
-	{#each rows as row (row.id)}
+	{#each virtualizer.items as item (item.key)}
+		{@const row = rows[item.index]}
 		{@const Icon = categoryIcon(row.categoryIcon)}
 		{@const open = expanded.has(row.id)}
-		<li>
-			<div class="flex items-center gap-2 py-2 pr-1 pl-3 text-sm">
+		<li
+			data-index={item.index}
+			{@attach virtualizer.measure}
+			class={[
+				'absolute inset-x-0 top-0 border-gray-100 dark:border-gray-800',
+				item.index < rows.length - 1 && 'border-b'
+			]}
+			style:transform="translateY({item.start - scrollMargin}px)"
+		>
+			<div
+				class={[
+					'flex items-center gap-2 py-2 pr-1 pl-3 text-sm',
+					selected.has(row.id) && 'bg-blue-50 dark:bg-blue-950/60'
+				]}
+			>
+				{#if selecting}
+					<input
+						type="checkbox"
+						class="size-5 shrink-0 rounded border-gray-300 text-gray-900 focus:ring-gray-500 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+						checked={selected.has(row.id)}
+						onchange={() => toggleSelected(row.id)}
+						aria-label="Select {row.name}, {formatNumericDate(row.date)}, {formatCents(
+							row.amountCents
+						)}"
+					/>
+				{/if}
 				<Icon class="size-4 shrink-0 text-gray-500" aria-label={row.categoryName} />
 				<span class="shrink-0 text-xs text-gray-500 tabular-nums"
 					>{formatNumericDate(row.date)}</span
@@ -54,18 +132,30 @@
 				</button>
 			</div>
 			{#if open}
-				<dl
+				<div
 					transition:slide={{ duration: slideDuration, easing: cubicOut }}
 					id="details-{row.id}"
-					class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 bg-gray-50 px-3 py-2 text-xs dark:bg-gray-900"
+					class="bg-gray-50 dark:bg-gray-900"
 				>
-					<dt class="text-gray-500">Name</dt>
-					<dd class="break-words">{row.name}</dd>
-					<dt class="text-gray-500">Category</dt>
-					<dd>{row.categoryName}</dd>
-					<dt class="text-gray-500">Notes</dt>
-					<dd class={row.notes ? '' : 'text-gray-400 italic'}>{row.notes ?? 'No notes'}</dd>
-				</dl>
+					<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-3 pt-2 text-xs">
+						<dt class="text-gray-500">Name</dt>
+						<dd class="break-words">{row.name}</dd>
+						<dt class="text-gray-500">Category</dt>
+						<dd>{row.categoryName}</dd>
+						<dt class="text-gray-500">Notes</dt>
+						<dd class={row.notes ? '' : 'text-gray-400 italic'}>{row.notes ?? 'No notes'}</dd>
+					</dl>
+					<div class="flex justify-end px-1 pb-1">
+						<button
+							type="button"
+							class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+							onclick={() => onDelete([row.id])}
+						>
+							<Trash class="size-3.5" aria-hidden="true" />
+							Delete
+						</button>
+					</div>
+				</div>
 			{/if}
 		</li>
 	{/each}

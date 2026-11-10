@@ -1,19 +1,65 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
+	import { createMediaQuery, WIDE_SCREEN } from '#lib/media.svelte.ts';
+	import DeleteDialog from '../../transactions/DeleteDialog.svelte';
+	import TransactionGrid from '../../transactions/TransactionGrid.svelte';
 	import TransactionList from '../../transactions/TransactionList.svelte';
-	import TransactionTable from '../../transactions/TransactionTable.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	const wide = createMediaQuery(WIDE_SCREEN);
+	const selected = new SvelteSet<string>();
+	let selecting = $state(false);
+
+	// The preview has no delete action, so confirming here shows an error instead of deleting.
+	let dialogOpen = $state(false);
+	let dialogIds = $state<string[]>([]);
+	function confirmDelete(ids: string[]) {
+		dialogIds = ids;
+		dialogOpen = true;
+	}
 </script>
 
 <svelte:head>
 	<title>Preview · Budget</title>
 </svelte:head>
 
-<main class="mx-auto flex max-w-6xl flex-col gap-4 p-4 sm:p-6">
+<main class="mx-auto flex max-w-6xl flex-col gap-4 p-4 sm:h-dvh sm:p-6">
 	<p class="text-xs text-amber-700 dark:text-amber-400">
-		Dev-only preview with made-up rows ({data.rows.length}). Add <code>?rows=500</code> for more.
+		Dev-only preview with made-up rows ({data.rows.length}). Add <code>?rows=5000</code> for more. Deleting
+		here is not wired up.
 	</p>
-	<div class="sm:hidden"><TransactionList rows={data.rows} /></div>
-	<div class="hidden sm:block"><TransactionTable rows={data.rows} /></div>
+	<div class="flex items-center gap-2 text-sm">
+		<button
+			type="button"
+			class="rounded-md border px-3 py-1"
+			onclick={() => (selecting = !selecting)}
+		>
+			{selecting ? 'Done' : 'Select'}
+		</button>
+		<span>{selected.size} selected</span>
+		<button
+			type="button"
+			class="rounded-md bg-red-600 px-3 py-1 text-white disabled:opacity-50"
+			disabled={selected.size === 0}
+			onclick={() => confirmDelete([...selected])}
+		>
+			Delete
+		</button>
+	</div>
+	<div class="sm:hidden">
+		<TransactionList
+			rows={data.rows}
+			{selected}
+			{selecting}
+			onDelete={confirmDelete}
+			active={wide.current !== true}
+		/>
+	</div>
+	<div class="hidden min-h-0 flex-1 sm:block">
+		<TransactionGrid rows={data.rows} label="Preview" {selected} active={wide.current !== false} />
+	</div>
 </main>
+
+<DeleteDialog bind:open={dialogOpen} kind="expense" ids={dialogIds} onDeleted={() => {}} />
