@@ -20,11 +20,15 @@
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio",
+		"db:sample": "node --env-file=.env scripts/sample-data.mjs",
+		"db:sample:clear": "node --env-file=.env scripts/sample-data.mjs --clear",
 		"auth:schema": "auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
+		"@internationalized/date": "3.12.4",
 		"@libsql/client": "^0.17.3",
+		"@lucide/svelte": "1.60.0",
 		"@sveltejs/adapter-vercel": "^7.0.0",
 		"@sveltejs/kit": "^3.0.0",
 		"@sveltejs/vite-plugin-svelte": "^7.2.0",
@@ -34,6 +38,7 @@
 		"@types/node": "^24",
 		"auth": "^1.6.24",
 		"better-auth": "^1.6.24",
+		"bits-ui": "2.20.2",
 		"drizzle-kit": "^0.31.10",
 		"drizzle-orm": "^0.45.2",
 		"eslint": "^10.4.1",

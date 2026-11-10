@@ -27,6 +27,9 @@ const notBlank = (column: AnySQLiteColumn): SQL => sql`length(trim(${column})) >
 const isCalendarDate = (column: AnySQLiteColumn): SQL => sql`date(${column}) IS ${column}`;
 const isYearMonth = (column: AnySQLiteColumn): SQL =>
 	sql`date(${column} || '-01') IS ${column} || '-01'`;
+// Lowercase letters, digits and dashes, e.g. "shopping-cart".
+const isIconName = (column: AnySQLiteColumn): SQL =>
+	sql`${column} IS NULL OR (length(${column}) > 0 AND ${column} NOT GLOB '*[^a-z0-9-]*')`;
 const isHexColor = (column: AnySQLiteColumn): SQL =>
 	sql`${column} IS NULL OR ${column} GLOB '#[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]'`;
 
@@ -43,6 +46,8 @@ export const expenseCategory = sqliteTable(
 		name: text('name').notNull(),
 		sortOrder: integer('sort_order').notNull().default(0),
 		color: text('color'),
+		// Lucide icon name; see src/lib/category-icons.ts. Null shows a generic tag icon.
+		icon: text('icon'),
 		archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
 		...timestamps
 	},
@@ -51,7 +56,8 @@ export const expenseCategory = sqliteTable(
 		// Target for the composite foreign keys below.
 		unique('expense_category_id_user_unique').on(t.id, t.userId),
 		check('expense_category_name_not_blank', notBlank(t.name)),
-		check('expense_category_color_hex', isHexColor(t.color))
+		check('expense_category_color_hex', isHexColor(t.color)),
+		check('expense_category_icon_name', isIconName(t.icon))
 	]
 );
 
@@ -65,6 +71,8 @@ export const incomeCategory = sqliteTable(
 		name: text('name').notNull(),
 		sortOrder: integer('sort_order').notNull().default(0),
 		color: text('color'),
+		// Lucide icon name; see src/lib/category-icons.ts. Null shows a generic tag icon.
+		icon: text('icon'),
 		archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
 		...timestamps
 	},
@@ -72,7 +80,8 @@ export const incomeCategory = sqliteTable(
 		uniqueIndex('income_category_user_name_unique').on(t.userId, sql`lower(${t.name})`),
 		unique('income_category_id_user_unique').on(t.id, t.userId),
 		check('income_category_name_not_blank', notBlank(t.name)),
-		check('income_category_color_hex', isHexColor(t.color))
+		check('income_category_color_hex', isHexColor(t.color)),
+		check('income_category_icon_name', isIconName(t.icon))
 	]
 );
 

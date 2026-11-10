@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import { clearPageCaches } from '#lib/offline.ts';
 	import type { PageProps } from './$types';
 
@@ -12,6 +13,13 @@
 
 <main class="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 p-6">
 	<h1 class="text-center text-3xl font-semibold">Welcome {data.username}</h1>
+
+	<a
+		href={resolve('/transactions')}
+		class="rounded-md bg-gray-900 px-4 py-2 text-white transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+	>
+		View transactions
+	</a>
 
 	<form
 		method="post"

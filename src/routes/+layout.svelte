@@ -1,10 +1,31 @@
 <script lang="ts">
 	import './layout.css';
 	import { asset } from '$app/paths';
+	import { invalidateAll } from '$app/navigation';
 	import { online } from 'svelte/reactivity/window';
 	import type { LayoutProps } from './$types';
 
-	let { children }: LayoutProps = $props();
+	let { children, data }: LayoutProps = $props();
+
+	// Keep the user's saved time zone in sync with this browser so "today" and
+	// "this month" match their clock. Reloads data once if it changed.
+	$effect(() => {
+		if (!data.signedIn) return;
+		const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		if (timezone === data.timezone) return;
+
+		fetch('/settings/timezone', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ timezone })
+		})
+			.then(async (response) => {
+				if (response.ok) await invalidateAll();
+			})
+			.catch(() => {
+				// Offline or failed; try again on the next page load.
+			});
+	});
 </script>
 
 <svelte:head>
