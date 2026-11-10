@@ -1,2 +1,31 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script lang="ts">
+	import { enhance } from '$app/forms';
+	import { clearPageCaches } from '#lib/offline.ts';
+	import type { PageProps } from './$types';
+
+	let { data }: PageProps = $props();
+</script>
+
+<svelte:head>
+	<title>Budget</title>
+</svelte:head>
+
+<main class="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-6 p-6">
+	<h1 class="text-center text-3xl font-semibold">Welcome {data.username}</h1>
+
+	<form
+		method="post"
+		action="?/signOut"
+		use:enhance={() =>
+			async ({ update }) => {
+				await clearPageCaches();
+				await update();
+			}}
+	>
+		<button
+			class="rounded-md border border-gray-300 px-4 py-2 text-sm transition hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800"
+		>
+			Sign out
+		</button>
+	</form>
+</main>

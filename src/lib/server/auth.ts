@@ -16,10 +16,19 @@ export const auth = betterAuth({
 	secret: BETTER_AUTH_SECRET,
 	database: drizzleAdapter(db, { provider: 'sqlite' }),
 	emailAndPassword: { enabled: false },
+	user: {
+		additionalFields: {
+			// GitHub login handle (e.g. "octocat"). `name` holds the display name instead.
+			username: { type: 'string', required: false, input: false }
+		}
+	},
 	socialProviders: {
 		github: {
 			clientId: GITHUB_CLIENT_ID,
-			clientSecret: GITHUB_CLIENT_SECRET
+			clientSecret: GITHUB_CLIENT_SECRET,
+			mapProfileToUser: (profile) => ({ username: profile.login }),
+			// Refresh name, avatar and username from GitHub on every sign-in.
+			overrideUserInfoOnSignIn: true
 		}
 	},
 	plugins: [
