@@ -4,9 +4,13 @@
 	import { invalidateAll } from '$app/navigation';
 	import { online } from 'svelte/reactivity/window';
 	import { Toaster } from 'svelte-sonner';
+	import { theme } from '#lib/theme.svelte.ts';
 	import type { LayoutProps } from './$types';
 
 	let { children, data }: LayoutProps = $props();
+
+	// Light/dark/system theme from the user menu; also follows the device setting on "system".
+	$effect(() => theme.init());
 
 	// Keep the user's saved time zone in sync with this browser so "today" and
 	// "this month" match their clock. Reloads data once if it changed.
@@ -46,5 +50,5 @@
 {@render children()}
 
 <!-- Toasts (e.g. "Added …", "Deleted …"), in the bottom-left corner on every page. Show them with
-     `toast()` / `toast.success()` from 'svelte-sonner'. Follows the system light/dark setting. -->
-<Toaster position="bottom-left" theme="system" richColors closeButton duration={5000} />
+     `toast()` / `toast.success()` from 'svelte-sonner'. Follows the chosen light/dark theme. -->
+<Toaster position="bottom-left" theme={theme.choice} richColors closeButton duration={5000} />

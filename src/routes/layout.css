@@ -2,9 +2,18 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
+/* `dark:` styles follow a `dark` class on <html> rather than the system setting, so the user
+   menu can force light or dark. src/app.html sets the class before the page paints (from the
+   saved choice, or the system setting by default); src/lib/theme.svelte.ts updates it. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
+	/* Native controls (selects, scrollbars, date inputs) match the chosen theme. */
 	html {
-		color-scheme: light dark;
+		color-scheme: light;
+	}
+	html.dark {
+		color-scheme: dark;
 	}
 
 	body {
