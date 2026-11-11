@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
 	import { LineChart } from 'layerchart';
-	import type { PacePoint } from '#lib/dashboard.ts';
+	import { CHART_PADDING, type PacePoint } from '#lib/dashboard.ts';
 	import { formatAxisDollars, formatCents, formatDollars } from '#lib/money.ts';
 	import ChartCard from './ChartCard.svelte';
 
@@ -73,6 +73,7 @@
 				}
 			]}
 			legend
+			padding={CHART_PADDING}
 			props={{
 				yAxis: { format: formatAxisDollars },
 				xAxis: { format: (day: number) => String(day) },

@@ -15,6 +15,13 @@ export type PacePoint = { day: number; thisMonth: number | null; lastMonth: numb
 
 const MAX_SLICES = 6;
 
+/**
+ * Inner padding for the line and bar charts. LayerChart's default leaves 20px for the y-axis,
+ * which "$2,500"-style labels overrun; 48px fits them inside the card. Bottom is the x-axis (20)
+ * plus the legend (32), as in the default.
+ */
+export const CHART_PADDING = { top: 4, right: 8, bottom: 52, left: 48 };
+
 /** Top categories plus everything else folded into "Other", so the pie stays readable. */
 export function topCategories(rows: CategorySlice[]): CategorySlice[] {
 	if (rows.length <= MAX_SLICES + 1) return rows;

@@ -1,6 +1,7 @@
 <!--
 	@component
-	Dialog for adding one expense or income entry: name, amount, date, category and notes.
+	Dialog for adding one expense or income entry: type (Expense | Income), name, amount, date,
+	category and notes. The page picks the starting type; the switch at the top changes it.
 	Submits to the transactions page's `create` action (src/routes/transactions/+page.server.ts),
 	which validates everything and returns per-field errors; the current page's data reloads
 	after a successful add. Used on the transactions page and the home page.
@@ -28,24 +29,25 @@
 
 	let {
 		open = $bindable(false),
-		kind,
-		categories,
+		kind = $bindable(),
+		categories: allCategories,
 		today,
 		action: actionOverride,
 		onCreated
 	}: {
 		open?: boolean;
+		/** Which type the form starts on; the switch in the dialog updates it. */
 		kind: TransactionKind;
 		/**
 		 * Where the form posts. Defaults to this page's `?/create` (the transactions page). Other
 		 * pages pass "/transactions?/create" to use the same action.
 		 */
 		action?: string;
-		/** Categories to choose from (archived ones already left out). */
-		categories: CategoryOption[];
+		/** Categories to choose from for each type (archived ones already left out). */
+		categories: Record<TransactionKind, CategoryOption[]>;
 		/** Default date: today in the user's time zone. */
 		today: PlainDate;
-		onCreated: (created: { name: string; date: PlainDate }) => void;
+		onCreated: (created: { kind: TransactionKind; name: string; date: PlainDate }) => void;
 	} = $props();
 
 	type Field = 'name' | 'amount' | 'date' | 'categoryId' | 'notes';
@@ -64,6 +66,7 @@
 	// Remember the last category used for each kind during this visit; it's often the same.
 	const lastCategory: Partial<Record<TransactionKind, string>> = {};
 
+	let categories = $derived(allCategories[kind]);
 	let label = $derived(kind === 'expense' ? 'expense' : 'income');
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
 	let amountHint = $derived(amount && parseAmount(amount) === null ? 'Like 12.50' : '');
@@ -79,6 +82,15 @@
 	$effect(() => {
 		if (open) untrack(reset);
 	});
+
+	// Switching type swaps the category list, so the picked category no longer applies.
+	function setKind(next: TransactionKind) {
+		if (next === kind) return;
+		kind = next;
+		const last = lastCategory[next];
+		categoryId = last && allCategories[next].some((c) => c.id === last) ? last : '';
+		errors = { ...errors, categoryId: undefined };
+	}
 
 	function reset() {
 		name = '';
@@ -133,7 +145,11 @@
 						if (result.type === 'success') {
 							lastCategory[kind] = categoryId;
 							open = false;
-							onCreated({ name: name.trim(), date: Temporal.PlainDate.from(date.toString()) });
+							onCreated({
+								kind,
+								name: name.trim(),
+								date: Temporal.PlainDate.from(date.toString())
+							});
 							// Stay on the current page (e.g. home) even though the action lives on
 							// /transactions; still reload this page's data.
 							await update({ reset: false, navigate: false });
@@ -149,7 +165,27 @@
 					};
 				}}
 			>
-				<input type="hidden" name="kind" value={kind} />
+				<!-- Type: a two-option radio group styled as a segmented switch. -->
+				<fieldset
+					class="grid grid-cols-2 gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700"
+				>
+					<legend class="sr-only">Type</legend>
+					{#each [['expense', 'Expense'], ['income', 'Income']] as const as [value, text] (value)}
+						<label
+							class="cursor-pointer rounded px-3 py-1.5 text-center text-sm font-medium text-gray-600 transition hover:text-gray-900 has-checked:bg-gray-900 has-checked:text-white has-focus-visible:ring-2 has-focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:text-gray-100 dark:has-checked:bg-white dark:has-checked:text-gray-900"
+						>
+							<input
+								type="radio"
+								name="kind"
+								{value}
+								checked={kind === value}
+								onchange={() => setKind(value)}
+								class="sr-only"
+							/>
+							{text}
+						</label>
+					{/each}
+				</fieldset>
 
 				<div class="flex flex-col gap-1">
 					<label for="add-name" class={fieldLabel}>Name</label>

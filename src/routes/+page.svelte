@@ -23,13 +23,21 @@
 	let addKind = $state<TransactionKind>('expense');
 	let addOpen = $state(false);
 
-	function openAdd(kind: TransactionKind) {
-		addKind = kind;
+	// One Add button; the dialog starts on Expense (the common case) and has a switch for Income.
+	function openAdd() {
+		addKind = 'expense';
 		addOpen = true;
 	}
 
-	function onCreated({ name, date }: { name: string; date: PlainDate }) {
-		const kind = addKind;
+	function onCreated({
+		kind,
+		name,
+		date
+	}: {
+		kind: TransactionKind;
+		name: string;
+		date: PlainDate;
+	}) {
 		toast.success(`Added “${name}”.`, {
 			description: formatDate(date),
 			// Opens the right tab, on the month the new entry is in.
@@ -61,15 +69,11 @@
 <AppHeader name={data.displayName} home />
 
 <main class="mx-auto flex max-w-6xl flex-col gap-4 px-4 pt-2 pb-6 sm:px-6">
-	<!-- Quick actions, left-aligned at the top (under "Budget"). Wraps onto two lines on narrow phones. -->
+	<!-- Quick actions, left-aligned at the top (under "Budget"). -->
 	<div class="flex flex-wrap items-center justify-start gap-3">
-		<button type="button" class={primary} onclick={() => openAdd('expense')}>
+		<button type="button" class={primary} onclick={openAdd}>
 			<Plus class="size-4" aria-hidden="true" />
-			Expense
-		</button>
-		<button type="button" class={primary} onclick={() => openAdd('income')}>
-			<Plus class="size-4" aria-hidden="true" />
-			Income
+			Add
 		</button>
 		<a href={resolve('/transactions')} class={secondary}>View transactions</a>
 	</div>
@@ -94,8 +98,8 @@
 
 <AddTransactionDialog
 	bind:open={addOpen}
-	kind={addKind}
-	categories={data.categories[addKind]}
+	bind:kind={addKind}
+	categories={data.categories}
 	today={data.today}
 	action="/transactions?/create"
 	{onCreated}

@@ -4,12 +4,28 @@
 	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
 	import DeleteDialog from '../../transactions/DeleteDialog.svelte';
 	import RangePicker from '../../transactions/RangePicker.svelte';
+	import MonthlyChart from '#lib/components/dashboard/MonthlyChart.svelte';
+	import PaceChart from '#lib/components/dashboard/PaceChart.svelte';
 	import StatTiles from '#lib/components/dashboard/StatTiles.svelte';
 	import TransactionGrid from '../../transactions/TransactionGrid.svelte';
 	import TransactionList from '../../transactions/TransactionList.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	// Made-up chart data, for checking the charts' axes and padding.
+	const pace = Array.from({ length: 30 }, (_, i) => ({
+		day: i + 1,
+		thisMonth: i < 10 ? (i + 1) * 31_000 : null,
+		lastMonth: (i + 1) * 28_000
+	}));
+	const trend = ['Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov'].map((label, i) => ({
+		month: `2026-0${i + 6}`,
+		label,
+		income: 650_000 + i * 20_000,
+		expenses: 520_000 + i * 35_000,
+		net: 130_000 - i * 15_000
+	}));
 
 	const wide = createMediaQuery(WIDE_SCREEN);
 	const selected = new SvelteSet<string>();
@@ -74,6 +90,10 @@
 			dayOfMonth: 10
 		}}
 	/>
+	<div class="grid gap-4 lg:grid-cols-2">
+		<PaceChart points={pace} thisMonthLabel="November" lastMonthLabel="October" />
+		<MonthlyChart months={trend} />
+	</div>
 	<RangePicker range={data.range} />
 	<div class="sm:hidden">
 		<TransactionList
@@ -95,7 +115,7 @@
 <AddTransactionDialog
 	bind:open={addOpen}
 	kind="expense"
-	categories={data.categories}
+	categories={{ expense: data.categories, income: [] }}
 	today={data.today}
 	onCreated={() => {}}
 />

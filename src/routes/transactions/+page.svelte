@@ -77,7 +77,7 @@
 		toast.success(`Deleted ${count} ${count === 1 ? one : many}.`);
 	}
 
-	// Adding: one dialog, opened for whichever tab's button was pressed.
+	// Adding: one dialog, starting on whichever tab's button was pressed (its switch can change it).
 	let addKind = $state<TransactionKind>('expense');
 	let addOpen = $state(false);
 
@@ -86,25 +86,36 @@
 		addOpen = true;
 	}
 
-	function onCreated({ name, date }: { name: string; date: PlainDate }) {
+	function onCreated({
+		kind,
+		name,
+		date
+	}: {
+		kind: TransactionKind;
+		name: string;
+		date: PlainDate;
+	}) {
 		const inRange =
 			Temporal.PlainDate.compare(date, data.range.from) >= 0 &&
 			Temporal.PlainDate.compare(date, data.range.to) <= 0;
-		if (inRange) {
+		const otherTab = (kind === 'income') !== (tab === 'income');
+		if (inRange && !otherTab) {
 			toast.success(`Added “${name}”.`);
 			return;
 		}
-		// Otherwise the new row isn't in the list, so say where it went and offer to go there.
-		const kind = addKind;
+		// Otherwise the new row isn't in view, so say where it went and offer to go there.
 		toast.success(`Added “${name}”.`, {
-			description: `${formatDate(date)} is outside the dates you’re viewing.`,
+			description: inRange
+				? `It’s on the ${kind === 'income' ? 'Income' : 'Expenses'} tab.`
+				: `${formatDate(date)} is outside the dates you’re viewing.`,
 			action: {
 				label: 'Show',
 				onClick: () =>
 					goto(
 						resolve(
 							`/transactions${updateQuery(page.url.search, {
-								...monthRangeParams(date, data.today),
+								// Keep the current dates when the entry is already in them.
+								...(inRange ? {} : monthRangeParams(date, data.today)),
 								tab: kind === 'income' ? 'income' : null
 							})}`
 						)
@@ -277,8 +288,8 @@
 
 <AddTransactionDialog
 	bind:open={addOpen}
-	kind={addKind}
-	categories={data.categories[addKind]}
+	bind:kind={addKind}
+	categories={data.categories}
 	today={data.today}
 	{onCreated}
 />

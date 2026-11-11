@@ -5,7 +5,7 @@
 -->
 <script lang="ts">
 	import { BarChart } from 'layerchart';
-	import type { MonthTotals } from '#lib/dashboard.ts';
+	import { CHART_PADDING, type MonthTotals } from '#lib/dashboard.ts';
 	import { formatAxisDollars, formatCents, formatDollars } from '#lib/money.ts';
 	import ChartCard from './ChartCard.svelte';
 
@@ -49,6 +49,7 @@
 			]}
 			seriesLayout="group"
 			legend
+			padding={CHART_PADDING}
 			props={{
 				yAxis: { format: formatAxisDollars },
 				tooltip: { item: { format: formatDollars } }
