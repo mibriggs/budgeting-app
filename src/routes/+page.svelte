@@ -5,6 +5,7 @@
 	import { resolve } from '$app/paths';
 	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
 	import AppHeader from '#lib/components/AppHeader.svelte';
+	import BudgetCard from '#lib/components/dashboard/BudgetCard.svelte';
 	import CategorySpending from '#lib/components/dashboard/CategorySpending.svelte';
 	import MonthlyChart from '#lib/components/dashboard/MonthlyChart.svelte';
 	import PaceChart from '#lib/components/dashboard/PaceChart.svelte';
@@ -80,18 +81,22 @@
 
 	<StatTiles tiles={data.dashboard.tiles} />
 
-	<!-- This month side by side (category split, pace), then the 6-month trend full width. -->
+	<!-- This month: where it went and how budgets stand, side by side; then pace and the 6-month
+	     trend, each full width. -->
 	<div class="grid gap-4 lg:grid-cols-2">
 		<CategorySpending
 			rows={data.dashboard.byCategory}
 			slices={data.dashboard.slices}
 			subtitle={thisMonthLabel}
 		/>
-		<PaceChart
-			points={data.dashboard.pace}
-			thisMonthLabel={monthName(data.dashboard.month)}
-			lastMonthLabel={monthName(data.dashboard.month.subtract({ months: 1 }))}
-		/>
+		<BudgetCard summary={data.dashboard.budgets} subtitle={thisMonthLabel} />
+		<div class="lg:col-span-2">
+			<PaceChart
+				points={data.dashboard.pace}
+				thisMonthLabel={monthName(data.dashboard.month)}
+				lastMonthLabel={monthName(data.dashboard.month.subtract({ months: 1 }))}
+			/>
+		</div>
 		<div class="lg:col-span-2"><MonthlyChart months={data.dashboard.trend} /></div>
 	</div>
 </main>

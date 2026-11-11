@@ -9,7 +9,10 @@ import type { Temporal } from '#lib/dates.ts';
 import { db } from '#lib/server/db/index.ts';
 import { expenseCategory, expenseCategoryLimit } from '#lib/server/db/schema.ts';
 
-/** The limit (cents, or null for none) in effect for `month`, per active expense category. */
+/**
+ * The limit (cents, or null for none) in effect for `month`, per active expense category, with
+ * its "everyday" flag.
+ */
 export function listBudgets(userId: string, month: Temporal.PlainYearMonth) {
 	// Written with explicit table names: in a single-table select Drizzle prints columns without
 	// their table, so `${expenseCategory.id}` here would read as the limit table's own `id`.
@@ -25,6 +28,7 @@ export function listBudgets(userId: string, month: Temporal.PlainYearMonth) {
 			id: expenseCategory.id,
 			name: expenseCategory.name,
 			icon: expenseCategory.icon,
+			everyday: expenseCategory.everyday,
 			limitCents: inEffect
 		})
 		.from(expenseCategory)
@@ -88,5 +92,20 @@ export async function saveBudgets(
 			});
 	});
 	const [first, ...rest] = writes;
+	await db.batch([first, ...rest]);
+}
+
+/**
+ * Sets the "everyday" flag on the user's expense categories (`changes`: category id → flag).
+ * Not part of the limit history: it describes the category, so it applies to every month.
+ */
+export async function saveEveryday(userId: string, changes: Map<string, boolean>) {
+	if (changes.size === 0) return;
+	const [first, ...rest] = [...changes].map(([id, everyday]) =>
+		db
+			.update(expenseCategory)
+			.set({ everyday })
+			.where(and(eq(expenseCategory.id, id), eq(expenseCategory.userId, userId)))
+	);
 	await db.batch([first, ...rest]);
 }

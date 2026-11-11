@@ -1,5 +1,6 @@
 <!--
-	Settings → Budgets: a monthly limit per expense category. Edits are drafts: changed rows are
+	Settings → Budgets: a monthly limit per expense category, and whether it's "everyday" spending
+	(compared to the month's pace on the home page). Edits are drafts: changed rows are
 	highlighted, and nothing is stored until Save (in the bar that appears at the bottom).
 	Saving sets the limits from this month on; earlier months keep theirs.
 -->
@@ -7,10 +8,11 @@
 	import { untrack } from 'svelte';
 	import { prefersReducedMotion } from 'svelte/motion';
 	import { fly } from 'svelte/transition';
+	import { Switch } from 'bits-ui';
 	import { toast } from 'svelte-sonner';
 	import { enhance } from '$app/forms';
 	import { beforeNavigate } from '$app/navigation';
-	import { limitField, parseLimit } from '#lib/budget-input.ts';
+	import { everydayField, limitField, parseLimit } from '#lib/budget-input.ts';
 	import { categoryIcon } from '#lib/category-icons.ts';
 	import { formatMonth } from '#lib/date-range.ts';
 	import { formatCents, formatCentsWhole } from '#lib/money.ts';
@@ -28,9 +30,14 @@
 	// What's stored (from the server) and what's typed. Drafts reset whenever the stored values
 	// change, i.e. on load and after a save.
 	let saved = $derived(Object.fromEntries(data.budgets.map((b) => [b.id, b.limitCents])));
+	let savedEveryday = $derived(Object.fromEntries(data.budgets.map((b) => [b.id, b.everyday])));
 	// svelte-ignore state_referenced_locally
 	let drafts = $state<Record<string, string>>(
 		Object.fromEntries(data.budgets.map((b) => [b.id, toInput(b.limitCents)]))
+	);
+	// svelte-ignore state_referenced_locally
+	let everydayDrafts = $state<Record<string, boolean>>(
+		Object.fromEntries(data.budgets.map((b) => [b.id, b.everyday]))
 	);
 	let saving = $state(false);
 	// Per-category errors from the save action (normally the page catches bad input first).
@@ -40,6 +47,7 @@
 		const rows = data.budgets;
 		untrack(() => {
 			drafts = Object.fromEntries(rows.map((b) => [b.id, toInput(b.limitCents)]));
+			everydayDrafts = Object.fromEntries(rows.map((b) => [b.id, b.everyday]));
 			serverErrors = {};
 		});
 	});
@@ -47,7 +55,11 @@
 	let parsed = $derived(
 		Object.fromEntries(Object.entries(drafts).map(([id, text]) => [id, parseLimit(text)]))
 	);
-	let changed = $derived(Object.keys(parsed).filter((id) => parsed[id] !== saved[id]));
+	const limitChanged = (id: string) => parsed[id] !== saved[id];
+	const everydayChanged = (id: string) => everydayDrafts[id] !== savedEveryday[id];
+	let changed = $derived(
+		data.budgets.map((b) => b.id).filter((id) => limitChanged(id) || everydayChanged(id))
+	);
 	let invalidCount = $derived(Object.values(parsed).filter((v) => v === 'invalid').length);
 
 	// The header shows what the budget will be once saved.
@@ -58,9 +70,17 @@
 	let monthLabel = $derived(formatMonth(data.month));
 
 	const describe = (cents: number | null) => (cents === null ? 'no limit' : formatCents(cents));
+	// "Was $600.00", "Was not everyday", or both.
+	function was(id: string) {
+		const parts: string[] = [];
+		if (limitChanged(id)) parts.push(describe(saved[id]));
+		if (everydayChanged(id)) parts.push(savedEveryday[id] ? 'everyday' : 'not everyday');
+		return `Was ${parts.join(', ')}`;
+	}
 
 	function discard() {
 		drafts = Object.fromEntries(data.budgets.map((b) => [b.id, toInput(b.limitCents)]));
+		everydayDrafts = Object.fromEntries(data.budgets.map((b) => [b.id, b.everyday]));
 		serverErrors = {};
 	}
 
@@ -83,6 +103,11 @@
 			<p class="text-sm text-gray-500 dark:text-gray-400">
 				Set how much you want to spend in each category per month. Changes start in {monthLabel};
 				past months aren’t affected.
+			</p>
+			<p id="everyday-help" class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+				<span class="font-medium text-gray-700 dark:text-gray-300">Everyday</span> categories, like groceries,
+				are spread through the month, so the home page warns when one is heading over at its current pace.
+				Turn it off for bills paid once a month, like rent.
 			</p>
 		</div>
 		<p class="text-sm tabular-nums">
@@ -138,6 +163,7 @@
 					{@const Icon = categoryIcon(category.icon)}
 					{@const inputId = `limit-${category.id}`}
 					{@const isChanged = changed.includes(category.id)}
+					{@const amountChanged = limitChanged(category.id)}
 					{@const error =
 						parsed[category.id] === 'invalid'
 							? 'Enter an amount like 600 or 12.50.'
@@ -152,6 +178,30 @@
 						<Icon class="size-4 shrink-0 text-gray-500" aria-hidden="true" />
 						<div class="flex min-w-0 flex-1 flex-col">
 							<label for={inputId} class="truncate text-sm">{category.name}</label>
+							<input
+								type="hidden"
+								name={everydayField(category.id)}
+								value={everydayDrafts[category.id] ? '1' : '0'}
+							/>
+							<!-- A switch (role="switch"); the hidden input above carries its value to the form. -->
+							<div class="flex w-fit items-center gap-2">
+								<Switch.Root
+									id="everyday-{category.id}"
+									bind:checked={everydayDrafts[category.id]}
+									aria-describedby="everyday-help"
+									class="inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-500 data-[state=checked]:bg-gray-900 data-[state=unchecked]:bg-gray-300 dark:data-[state=checked]:bg-white dark:data-[state=unchecked]:bg-gray-700"
+								>
+									<Switch.Thumb
+										class="block size-4 rounded-full bg-white shadow-sm transition-transform data-[state=checked]:translate-x-4 dark:data-[state=checked]:bg-gray-900"
+									/>
+								</Switch.Root>
+								<label
+									for="everyday-{category.id}"
+									class="text-xs text-gray-600 dark:text-gray-400"
+								>
+									Everyday
+								</label>
+							</div>
 							{#if error}
 								<span id="{inputId}-note" class="text-xs text-red-700 dark:text-red-400">
 									{error}
@@ -162,7 +212,7 @@
 									id="{inputId}-note"
 									class="text-xs text-amber-800 tabular-nums dark:text-amber-300"
 								>
-									Was {describe(saved[category.id])}
+									{was(category.id)}
 								</span>
 							{/if}
 						</div>
@@ -189,7 +239,7 @@
 								}}
 								class={[
 									'w-full rounded-md bg-white py-1.5 pr-2.5 pl-6 text-right text-sm tabular-nums placeholder:text-gray-400 aria-invalid:border-red-500 dark:bg-gray-900',
-									isChanged && !error
+									amountChanged && !error
 										? 'border-amber-500 focus:border-amber-500 focus:ring-amber-500 dark:border-amber-400 dark:focus:border-amber-400 dark:focus:ring-amber-400'
 										: 'border-gray-300 focus:border-gray-500 focus:ring-gray-500 dark:border-gray-700'
 								]}

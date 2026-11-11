@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { summarizeBudgets } from '#lib/budget-status.ts';
 import { today } from '#lib/dates.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
 import {
@@ -9,6 +10,7 @@ import {
 	spendingByCategory,
 	topCategories
 } from '#lib/server/budget/dashboard.ts';
+import { listBudgets } from '#lib/server/budget/limits.ts';
 import { displayName } from '#lib/server/user.ts';
 import type { PageServerLoad } from './login/$types';
 
@@ -28,7 +30,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const lastEnd = thisStart.subtract({ days: 1 });
 	const trendStart = thisStart.subtract({ months: TREND_MONTHS - 1 });
 
-	const [expenseCategories, incomeCategories, months, byCategory, thisDaily, lastDaily] =
+	const [expenseCategories, incomeCategories, months, byCategory, thisDaily, lastDaily, limits] =
 		await Promise.all([
 			// For the add expense / add income dialogs.
 			listActiveCategories(userId, 'expense'),
@@ -37,7 +39,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			monthlyTotals(userId, trendStart, thisEnd),
 			spendingByCategory(userId, thisStart, thisEnd),
 			dailySpending(userId, thisStart, todayForUser),
-			dailySpending(userId, lastStart, lastEnd)
+			dailySpending(userId, lastStart, lastEnd),
+			listBudgets(userId, thisStart.toPlainYearMonth())
 		]);
 
 	const trend = fillMonths(trendStart.toPlainYearMonth(), thisStart.toPlainYearMonth(), months);
@@ -63,7 +66,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 			byCategory,
 			slices: topCategories(byCategory),
 			trend,
-			pace
+			pace,
+			budgets: summarizeBudgets(
+				limits,
+				new Map(byCategory.map((row) => [row.id, row.cents])),
+				todayForUser
+			)
 		}
 	};
 };

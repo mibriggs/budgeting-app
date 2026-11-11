@@ -2,30 +2,31 @@ import type { CategoryIconName } from '#lib/category-icons.ts';
 import { db } from '#lib/server/db/index.ts';
 import { expenseCategory, incomeCategory } from '#lib/server/db/schema.ts';
 
-// Categories every new user starts with. They can rename, reorder, archive or add to them.
+// Categories every new user starts with. `everyday: false` marks bills paid once a month
+// (budgets don't compare those to the month's pace). They can rename, reorder, archive or add to them.
 // Existing users got the same list from migrations drizzle/0003_seed_default_categories.sql
 // (names) and drizzle/0004_category_icons.sql (icons); changing this list only
 // affects users created afterwards.
 
-type DefaultCategory = { name: string; icon: CategoryIconName };
+type DefaultCategory = { name: string; icon: CategoryIconName; everyday?: boolean };
 
 export const DEFAULT_EXPENSE_CATEGORIES: DefaultCategory[] = [
-	{ name: 'Rent', icon: 'house' },
+	{ name: 'Rent', icon: 'house', everyday: false },
 	{ name: 'Laundry', icon: 'washing-machine' },
-	{ name: 'Housing', icon: 'sofa' },
+	{ name: 'Housing', icon: 'sofa', everyday: false },
 	{ name: 'Groceries', icon: 'shopping-cart' },
 	{ name: 'Transportation', icon: 'car' },
 	{ name: 'Entertainment & Eating Out', icon: 'utensils-crossed' },
 	{ name: 'Medical & Health', icon: 'stethoscope' },
 	{ name: 'Wellness', icon: 'dumbbell' },
-	{ name: 'Utilities', icon: 'zap' },
-	{ name: 'Education', icon: 'graduation-cap' },
+	{ name: 'Utilities', icon: 'zap', everyday: false },
+	{ name: 'Education', icon: 'graduation-cap', everyday: false },
 	{ name: 'Personal & Misc.', icon: 'shapes' },
 	{ name: 'Technology', icon: 'laptop' },
-	{ name: 'Savings', icon: 'piggy-bank' },
+	{ name: 'Savings', icon: 'piggy-bank', everyday: false },
 	{ name: 'Pet', icon: 'paw-print' },
 	{ name: 'Gifts', icon: 'gift' },
-	{ name: 'Subscriptions', icon: 'repeat' },
+	{ name: 'Subscriptions', icon: 'repeat', everyday: false },
 	{ name: 'Date Night', icon: 'heart' },
 	{ name: 'Snacks & Candy', icon: 'candy' }
 ];

@@ -18,3 +18,6 @@ export function parseLimit(input: string): number | null | 'invalid' {
 
 /** Form field name for one category's limit box. */
 export const limitField = (categoryId: string) => `limit:${categoryId}`;
+
+/** Form field name for one category's "everyday" switch ("1" on, "0" off). */
+export const everydayField = (categoryId: string) => `everyday:${categoryId}`;

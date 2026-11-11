@@ -48,6 +48,9 @@ export const expenseCategory = sqliteTable(
 		color: text('color'),
 		// Lucide icon name; see src/lib/category-icons.ts. Null shows a generic tag icon.
 		icon: text('icon'),
+		// "Everyday" spending is spread through the month (groceries, eating out), so budgets
+		// compare it to the month's pace. Off for bills paid once a month (rent, subscriptions).
+		everyday: integer('everyday', { mode: 'boolean' }).notNull().default(true),
 		archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
 		...timestamps
 	},
@@ -57,7 +60,8 @@ export const expenseCategory = sqliteTable(
 		unique('expense_category_id_user_unique').on(t.id, t.userId),
 		check('expense_category_name_not_blank', notBlank(t.name)),
 		check('expense_category_color_hex', isHexColor(t.color)),
-		check('expense_category_icon_name', isIconName(t.icon))
+		check('expense_category_icon_name', isIconName(t.icon)),
+		check('expense_category_everyday_bool', sql`${t.everyday} IN (0, 1)`)
 	]
 );
 
