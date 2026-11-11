@@ -4,6 +4,7 @@
 	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
 	import DeleteDialog from '../../transactions/DeleteDialog.svelte';
 	import RangePicker from '../../transactions/RangePicker.svelte';
+	import StatTiles from '#lib/components/dashboard/StatTiles.svelte';
 	import TransactionGrid from '../../transactions/TransactionGrid.svelte';
 	import TransactionList from '../../transactions/TransactionList.svelte';
 	import type { PageProps } from './$types';
@@ -54,6 +55,25 @@
 			Add (preview)
 		</button>
 	</div>
+	<!-- Net tile in both states (made-up numbers). -->
+	<StatTiles
+		tiles={{
+			income: 405044,
+			expenses: 358200,
+			net: 46844,
+			lastMonthToDate: 314371,
+			dayOfMonth: 10
+		}}
+	/>
+	<StatTiles
+		tiles={{
+			income: 250000,
+			expenses: 352000,
+			net: -102000,
+			lastMonthToDate: 400000,
+			dayOfMonth: 10
+		}}
+	/>
 	<RangePicker range={data.range} />
 	<div class="sm:hidden">
 		<TransactionList

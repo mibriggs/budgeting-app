@@ -80,6 +80,15 @@ export function monthRangeParams(
 	};
 }
 
+/** "November 2026", or "November" with `{ year: false }`. */
+export function formatMonth(month: Temporal.PlainYearMonth, { year = true } = {}): string {
+	return new Intl.DateTimeFormat('en-US', {
+		month: 'long',
+		year: year ? 'numeric' : undefined,
+		timeZone: 'UTC'
+	}).format(new Date(Date.UTC(month.year, month.month - 1, 1)));
+}
+
 /** "Nov 1 – 30, 2026" style label for a range. */
 export function formatRange({ from, to }: Pick<DateRange, 'from' | 'to'>): string {
 	const format = new Intl.DateTimeFormat('en-US', {

@@ -5,13 +5,20 @@
 	import { resolve } from '$app/paths';
 	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
 	import AppHeader from '#lib/components/AppHeader.svelte';
-	import type { PlainDate } from '#lib/dates.ts';
-	import { formatDate, monthRangeParams } from '#lib/date-range.ts';
+	import CategorySpending from '#lib/components/dashboard/CategorySpending.svelte';
+	import MonthlyChart from '#lib/components/dashboard/MonthlyChart.svelte';
+	import PaceChart from '#lib/components/dashboard/PaceChart.svelte';
+	import StatTiles from '#lib/components/dashboard/StatTiles.svelte';
+	import type { PlainDate, Temporal } from '#lib/dates.ts';
+	import { formatDate, formatMonth, monthRangeParams } from '#lib/date-range.ts';
 	import { updateQuery } from '#lib/url.ts';
 	import type { TransactionKind } from '#lib/server/budget/transactions.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
+
+	const monthName = (month: Temporal.PlainYearMonth) => formatMonth(month, { year: false });
+	let thisMonthLabel = $derived(formatMonth(data.dashboard.month));
 
 	let addKind = $state<TransactionKind>('expense');
 	let addOpen = $state(false);
@@ -65,6 +72,23 @@
 			Income
 		</button>
 		<a href={resolve('/transactions')} class={secondary}>View transactions</a>
+	</div>
+
+	<StatTiles tiles={data.dashboard.tiles} />
+
+	<!-- This month side by side (category split, pace), then the 6-month trend full width. -->
+	<div class="grid gap-4 lg:grid-cols-2">
+		<CategorySpending
+			rows={data.dashboard.byCategory}
+			slices={data.dashboard.slices}
+			subtitle={thisMonthLabel}
+		/>
+		<PaceChart
+			points={data.dashboard.pace}
+			thisMonthLabel={monthName(data.dashboard.month)}
+			lastMonthLabel={monthName(data.dashboard.month.subtract({ months: 1 }))}
+		/>
+		<div class="lg:col-span-2"><MonthlyChart months={data.dashboard.trend} /></div>
 	</div>
 </main>
 
