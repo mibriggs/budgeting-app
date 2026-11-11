@@ -158,9 +158,9 @@
 		</div>
 	{:else}
 		<div class="flex h-full flex-col gap-2">
-			<!-- Selection bar. Sticks to the top on phones, where the page itself scrolls. -->
+			<!-- Selection bar. Sticks just below the header on phones, where the page itself scrolls. -->
 			<div
-				class="sticky top-0 z-30 -mx-4 flex min-h-10 flex-wrap items-center gap-2 bg-white px-4 py-1 text-sm sm:static sm:mx-0 sm:px-0 dark:bg-gray-950"
+				class="sticky top-14 z-30 -mx-4 flex min-h-10 flex-wrap items-center gap-2 bg-white px-4 py-1 text-sm sm:static sm:mx-0 sm:px-0 dark:bg-gray-950"
 			>
 				<button
 					type="button"

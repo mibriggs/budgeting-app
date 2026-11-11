@@ -66,4 +66,24 @@
 	label:has(> input[type='checkbox']:not(:disabled)) {
 		cursor: pointer;
 	}
+
+	/* Press feedback: buttons (and links styled as buttons, marked `.press`) shrink slightly while
+	   held. Same targets as the pointer rule above, plus the add dialog's Expense | Income switch.
+	   Opt out with `data-no-press` (e.g. full-width grid headers, where it looks like a glitch).
+	   Utilities like `transition` already include `scale`, so they keep the animation. Skipped
+	   when the device asks for reduced motion. */
+	@media (prefers-reduced-motion: no-preference) {
+		:is(
+			button:not(:disabled),
+			[role='button']:not([aria-disabled='true']),
+			.press,
+			label:has(> input[type='radio'])
+		):not([data-no-press]) {
+			transition: scale 150ms ease-out;
+
+			&:active {
+				scale: 0.92;
+			}
+		}
+	}
 }

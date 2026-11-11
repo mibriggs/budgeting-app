@@ -148,6 +148,7 @@
 				>
 					<button
 						type="button"
+						data-no-press
 						onclick={() => (sort = nextSort(sort, column.key))}
 						class={[
 							'group flex h-9 w-full items-center gap-1.5 px-2 text-left hover:bg-gray-100 dark:hover:bg-gray-800',

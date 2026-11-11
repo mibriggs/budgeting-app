@@ -4,7 +4,7 @@
 //   (composite foreign key on (category_id, user_id)).
 // - A category that still has expenses/income can't be deleted. Archive it instead.
 // - Category names are unique per user, ignoring case, and can't be blank.
-// - Amounts are whole cents and greater than zero; limits are zero or more.
+// - Amounts are whole cents and greater than zero; limits are zero or more (or NULL = none).
 // - Dates must be real calendar dates ('YYYY-MM-DD'); months must be 'YYYY-MM'.
 // - Colors must be '#rrggbb'.
 
@@ -91,7 +91,8 @@ export const incomeCategory = sqliteTable(
 // A row applies from `effectiveMonth` onward until a later row replaces it, so
 // changing a limit adds a row for the current month and past months keep their
 // old limit. The limit for month M is the row with the latest effectiveMonth <= M.
-// No row at all means "no limit set".
+// A row with limitCents NULL means "no limit from this month on" (removing a limit that an
+// earlier row set). No row at all also means no limit.
 
 export const expenseCategoryLimit = sqliteTable(
 	'expense_category_limit',
@@ -101,13 +102,16 @@ export const expenseCategoryLimit = sqliteTable(
 			.notNull()
 			.references(() => expenseCategory.id, { onDelete: 'cascade' }),
 		effectiveMonth: plainYearMonth('effective_month').notNull(),
-		limitCents: integer('limit_cents').notNull(),
+		limitCents: integer('limit_cents'),
 		...timestamps
 	},
 	(t) => [
 		unique('expense_category_limit_month_unique').on(t.categoryId, t.effectiveMonth),
 		check('expense_category_limit_month_valid', isYearMonth(t.effectiveMonth)),
-		check('expense_category_limit_not_negative', sql`${t.limitCents} >= 0`)
+		check(
+			'expense_category_limit_not_negative',
+			sql`${t.limitCents} IS NULL OR ${t.limitCents} >= 0`
+		)
 	]
 );
 
