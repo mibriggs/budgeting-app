@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Trash from '@lucide/svelte/icons/trash';
 	import { Tabs } from 'bits-ui';
+	import { toast } from 'svelte-sonner';
 	import { untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { goto } from '$app/navigation';
@@ -8,12 +9,13 @@
 	import { page } from '$app/state';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { Temporal, type PlainDate } from '#lib/dates.ts';
-	import { formatDate, formatRange } from '#lib/date-range.ts';
+	import { formatDate, formatRange, monthRangeParams } from '#lib/date-range.ts';
 	import { createMediaQuery, WIDE_SCREEN } from '#lib/media.svelte.ts';
 	import { formatCents } from '#lib/money.ts';
 	import { updateQuery } from '#lib/url.ts';
 	import type { TransactionKind, TransactionRow } from '#lib/server/budget/transactions.ts';
 	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
+	import AppHeader from '#lib/components/AppHeader.svelte';
 	import DeleteDialog from './DeleteDialog.svelte';
 	import RangePicker from './RangePicker.svelte';
 	import TransactionList from './TransactionList.svelte';
@@ -58,10 +60,6 @@
 	// Deleting: the dialog confirms first, so nothing is removed by a single click.
 	let pendingDelete = $state<{ kind: TransactionKind; ids: string[] } | null>(null);
 	let dialogOpen = $state(false);
-	// Short confirmation ("Deleted 3 expenses.") shown in the tab it applies to.
-	let status = $state<{ kind: TransactionKind; message: string } | null>(null);
-	let statusTimer: ReturnType<typeof setTimeout> | undefined;
-
 	function confirmDelete(kind: TransactionKind, ids: string[]) {
 		if (ids.length === 0) return;
 		pendingDelete = { kind, ids };
@@ -76,13 +74,7 @@
 
 		const [one, many] =
 			kind === 'expense' ? ['expense', 'expenses'] : ['income entry', 'income entries'];
-		showStatus(kind, `Deleted ${count} ${count === 1 ? one : many}.`);
-	}
-
-	function showStatus(kind: TransactionKind, message: string) {
-		status = { kind, message };
-		clearTimeout(statusTimer);
-		statusTimer = setTimeout(() => (status = null), 6000);
+		toast.success(`Deleted ${count} ${count === 1 ? one : many}.`);
 	}
 
 	// Adding: one dialog, opened for whichever tab's button was pressed.
@@ -98,13 +90,27 @@
 		const inRange =
 			Temporal.PlainDate.compare(date, data.range.from) >= 0 &&
 			Temporal.PlainDate.compare(date, data.range.to) <= 0;
-		// Otherwise the new row wouldn't appear, and it would look like nothing happened.
-		showStatus(
-			addKind,
-			inRange
-				? `Added “${name}”.`
-				: `Added “${name}” on ${formatDate(date)}, outside the dates you’re viewing.`
-		);
+		if (inRange) {
+			toast.success(`Added “${name}”.`);
+			return;
+		}
+		// Otherwise the new row isn't in the list, so say where it went and offer to go there.
+		const kind = addKind;
+		toast.success(`Added “${name}”.`, {
+			description: `${formatDate(date)} is outside the dates you’re viewing.`,
+			action: {
+				label: 'Show',
+				onClick: () =>
+					goto(
+						resolve(
+							`/transactions${updateQuery(page.url.search, {
+								...monthRangeParams(date, data.today),
+								tab: kind === 'income' ? 'income' : null
+							})}`
+						)
+					)
+			}
+		});
 	}
 
 	function selectTab(value: string) {
@@ -139,9 +145,6 @@
 			<p>No {label.toLowerCase()} from {rangeLabel}.</p>
 			{@render addButton(kind)}
 		</div>
-		{#if status?.kind === kind}<p class="mt-2 text-sm text-gray-500" role="status">
-				{status.message}
-			</p>{/if}
 	{:else}
 		<div class="flex h-full flex-col gap-2">
 			<!-- Selection bar. Sticks to the top on phones, where the page itself scrolls. -->
@@ -171,8 +174,6 @@
 				<p class="text-gray-500" aria-live="polite">
 					{#if selected.size > 0}
 						<span class="font-medium text-gray-900 dark:text-gray-100">{selected.size}</span> selected
-					{:else if status?.kind === kind}
-						{status.message}
 					{:else}
 						<span class="hidden sm:inline"
 							>Tick rows to select them. Shift-click selects a range.</span
@@ -222,55 +223,57 @@
 {/snippet}
 
 <!-- On wider screens the page is exactly one screen tall and the grid scrolls inside it. -->
-<main class="mx-auto flex max-w-6xl flex-col gap-6 p-4 sm:h-dvh sm:p-6">
-	<header class="flex flex-col gap-4">
-		<div class="flex items-baseline justify-between gap-4">
+<div class="flex flex-col sm:h-dvh">
+	<AppHeader name={data.displayName} />
+	<main
+		class="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-6 px-4 pt-2 pb-4 sm:px-6 sm:pb-6"
+	>
+		<header class="flex flex-col gap-4">
 			<h1 class="text-2xl font-semibold">Transactions</h1>
-			<a href={resolve('/')} class="text-sm text-gray-500 hover:underline">Home</a>
-		</div>
-		<RangePicker range={data.range} />
-		{#if data.range.error}
-			<p class="text-sm text-amber-700 dark:text-amber-400" role="alert">
-				{data.range.error} Showing this month instead.
-			</p>
-		{/if}
-		<dl class="grid grid-cols-3 gap-2 text-sm sm:max-w-md">
-			<div>
-				<dt class="text-gray-500">Income</dt>
-				<dd class="font-medium tabular-nums">{formatCents(incomeTotal)}</dd>
-			</div>
-			<div>
-				<dt class="text-gray-500">Expenses</dt>
-				<dd class="font-medium tabular-nums">{formatCents(expenseTotal)}</dd>
-			</div>
-			<div>
-				<dt class="text-gray-500">Net</dt>
-				<dd class="font-medium tabular-nums">{formatCents(incomeTotal - expenseTotal)}</dd>
-			</div>
-		</dl>
-		<p class="text-xs text-gray-500">{rangeLabel}</p>
-	</header>
+			<RangePicker range={data.range} />
+			{#if data.range.error}
+				<p class="text-sm text-amber-700 dark:text-amber-400" role="alert">
+					{data.range.error} Showing this month instead.
+				</p>
+			{/if}
+			<dl class="grid grid-cols-3 gap-2 text-sm sm:max-w-md">
+				<div>
+					<dt class="text-gray-500">Income</dt>
+					<dd class="font-medium tabular-nums">{formatCents(incomeTotal)}</dd>
+				</div>
+				<div>
+					<dt class="text-gray-500">Expenses</dt>
+					<dd class="font-medium tabular-nums">{formatCents(expenseTotal)}</dd>
+				</div>
+				<div>
+					<dt class="text-gray-500">Net</dt>
+					<dd class="font-medium tabular-nums">{formatCents(incomeTotal - expenseTotal)}</dd>
+				</div>
+			</dl>
+			<p class="text-xs text-gray-500">{rangeLabel}</p>
+		</header>
 
-	<Tabs.Root value={tab} onValueChange={selectTab} class="flex min-h-0 flex-1 flex-col gap-3">
-		<Tabs.List class="flex gap-1 border-b border-gray-200 dark:border-gray-800">
-			{#each [{ value: 'expenses', label: 'Expenses', count: data.expenses.length }, { value: 'income', label: 'Income', count: data.incomes.length }] as item (item.value)}
-				<Tabs.Trigger
-					value={item.value}
-					class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-gray-500 transition hover:text-gray-900 data-[state=active]:border-gray-900 data-[state=active]:font-medium data-[state=active]:text-gray-900 dark:hover:text-gray-100 dark:data-[state=active]:border-gray-100 dark:data-[state=active]:text-gray-100"
-				>
-					{item.label}
-					<span class="ml-1 text-xs text-gray-400 tabular-nums">{item.count}</span>
-				</Tabs.Trigger>
-			{/each}
-		</Tabs.List>
-		<Tabs.Content value="expenses" class="min-h-0 flex-1">
-			{@render table(data.expenses, 'expense')}
-		</Tabs.Content>
-		<Tabs.Content value="income" class="min-h-0 flex-1">
-			{@render table(data.incomes, 'income')}
-		</Tabs.Content>
-	</Tabs.Root>
-</main>
+		<Tabs.Root value={tab} onValueChange={selectTab} class="flex min-h-0 flex-1 flex-col gap-3">
+			<Tabs.List class="flex gap-1 border-b border-gray-200 dark:border-gray-800">
+				{#each [{ value: 'expenses', label: 'Expenses', count: data.expenses.length }, { value: 'income', label: 'Income', count: data.incomes.length }] as item (item.value)}
+					<Tabs.Trigger
+						value={item.value}
+						class="-mb-px border-b-2 border-transparent px-3 py-2 text-sm text-gray-500 transition hover:text-gray-900 data-[state=active]:border-gray-900 data-[state=active]:font-medium data-[state=active]:text-gray-900 dark:hover:text-gray-100 dark:data-[state=active]:border-gray-100 dark:data-[state=active]:text-gray-100"
+					>
+						{item.label}
+						<span class="ml-1 text-xs text-gray-400 tabular-nums">{item.count}</span>
+					</Tabs.Trigger>
+				{/each}
+			</Tabs.List>
+			<Tabs.Content value="expenses" class="min-h-0 flex-1">
+				{@render table(data.expenses, 'expense')}
+			</Tabs.Content>
+			<Tabs.Content value="income" class="min-h-0 flex-1">
+				{@render table(data.incomes, 'income')}
+			</Tabs.Content>
+		</Tabs.Root>
+	</main>
+</div>
 
 <AddTransactionDialog
 	bind:open={addOpen}

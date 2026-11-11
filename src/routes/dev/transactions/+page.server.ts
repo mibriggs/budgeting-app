@@ -6,6 +6,7 @@ import { dev } from '$app/env';
 import { DEFAULT_EXPENSE_CATEGORIES } from '#lib/server/budget/defaults.ts';
 import type { TransactionRow } from '#lib/server/budget/transactions.ts';
 import { today } from '#lib/dates.ts';
+import { resolveRange } from '#lib/date-range.ts';
 import type { PageServerLoad } from './$types';
 
 const NAMES = [
@@ -46,5 +47,13 @@ export const load: PageServerLoad = ({ url }) => {
 		};
 	});
 
-	return { rows };
+	// For previewing the range picker and the add dialog (which can't save here).
+	const categories = DEFAULT_EXPENSE_CATEGORIES.map((c, i) => ({
+		id: `category-${i}`,
+		name: c.name,
+		icon: c.icon
+	}));
+	const range = resolveRange(url.searchParams, start);
+
+	return { rows, categories, today: start, range };
 };

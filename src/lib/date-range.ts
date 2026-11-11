@@ -61,6 +61,25 @@ function parseDate(value: string | null): PlainDate | null {
 	}
 }
 
+/**
+ * Query params (for `updateQuery`) that show the month containing `date` on the transactions
+ * page: the default "This month" when it's the current month, otherwise a custom range for it.
+ */
+export function monthRangeParams(
+	date: PlainDate,
+	today: PlainDate
+): Record<'range' | 'from' | 'to', string | null> {
+	if (date.year === today.year && date.month === today.month) {
+		return { range: null, from: null, to: null };
+	}
+	const start = date.with({ day: 1 });
+	return {
+		range: 'custom',
+		from: start.toString(),
+		to: start.add({ months: 1 }).subtract({ days: 1 }).toString()
+	};
+}
+
 /** "Nov 1 – 30, 2026" style label for a range. */
 export function formatRange({ from, to }: Pick<DateRange, 'from' | 'to'>): string {
 	const format = new Intl.DateTimeFormat('en-US', {

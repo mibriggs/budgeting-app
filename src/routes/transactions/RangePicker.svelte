@@ -6,10 +6,13 @@
 	import { page } from '$app/state';
 	import { RANGE_PRESETS, type DateRange } from '#lib/date-range.ts';
 	import { updateQuery } from '#lib/url.ts';
+	import { focusCalendarDay } from '#lib/calendar.ts';
+	import { today } from '#lib/dates.ts';
 
 	let { range }: { range: DateRange } = $props();
 
 	let open = $state(false);
+	let popoverContent = $state<HTMLElement | null>(null);
 	let selection = $state<CalendarRange>({ start: undefined, end: undefined });
 	let placeholder = $state<DateValue>();
 
@@ -25,10 +28,10 @@
 
 	function onOpenChange(isOpen: boolean) {
 		if (!isOpen) return;
-		// Open with nothing selected. Show the custom range's first month if one is being
-		// viewed, otherwise the current month (the last month of every preset).
+		// Open with nothing selected, on the custom range's first day if one is being viewed,
+		// otherwise on today. That date is also the one that gets keyboard focus.
 		selection = { start: undefined, end: undefined };
-		placeholder = parseDate((range.preset === 'custom' ? range.from : range.to).toString());
+		placeholder = parseDate((range.preset === 'custom' ? range.from : today()).toString());
 	}
 
 	function onSelect(value: CalendarRange) {
@@ -91,6 +94,8 @@
 		</Popover.Trigger>
 		<Popover.Portal>
 			<Popover.Content
+				bind:ref={popoverContent}
+				onOpenAutoFocus={(event) => focusCalendarDay(event, popoverContent)}
 				sideOffset={6}
 				align="start"
 				collisionPadding={8}

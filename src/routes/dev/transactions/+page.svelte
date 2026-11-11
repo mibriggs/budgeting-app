@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
 	import { createMediaQuery, WIDE_SCREEN } from '#lib/media.svelte.ts';
+	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
 	import DeleteDialog from '../../transactions/DeleteDialog.svelte';
+	import RangePicker from '../../transactions/RangePicker.svelte';
 	import TransactionGrid from '../../transactions/TransactionGrid.svelte';
 	import TransactionList from '../../transactions/TransactionList.svelte';
 	import type { PageProps } from './$types';
@@ -15,6 +17,7 @@
 	// The preview has no delete action, so confirming here shows an error instead of deleting.
 	let dialogOpen = $state(false);
 	let dialogIds = $state<string[]>([]);
+	let addOpen = $state(false);
 	function confirmDelete(ids: string[]) {
 		dialogIds = ids;
 		dialogOpen = true;
@@ -47,7 +50,11 @@
 		>
 			Delete
 		</button>
+		<button type="button" class="rounded-md border px-3 py-1" onclick={() => (addOpen = true)}>
+			Add (preview)
+		</button>
 	</div>
+	<RangePicker range={data.range} />
 	<div class="sm:hidden">
 		<TransactionList
 			rows={data.rows}
@@ -63,3 +70,12 @@
 </main>
 
 <DeleteDialog bind:open={dialogOpen} kind="expense" ids={dialogIds} onDeleted={() => {}} />
+
+<!-- Saving fails here (no create action on this page); it's for checking the dialog itself. -->
+<AddTransactionDialog
+	bind:open={addOpen}
+	kind="expense"
+	categories={data.categories}
+	today={data.today}
+	onCreated={() => {}}
+/>

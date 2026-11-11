@@ -10,4 +10,17 @@
 	body {
 		@apply bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100;
 	}
+
+	/* Tailwind v4 gives buttons the default arrow cursor; use the hand for anything clickable.
+	   Covers Bits UI parts too (tab, select, popover and dialog triggers are buttons; calendar
+	   days use role="button"). Disabled controls keep the arrow. */
+	button:not(:disabled),
+	[role='button']:not([aria-disabled='true']),
+	select:not(:disabled),
+	summary,
+	input[type='checkbox']:not(:disabled),
+	input[type='radio']:not(:disabled),
+	label:has(> input[type='checkbox']:not(:disabled)) {
+		cursor: pointer;
+	}
 }

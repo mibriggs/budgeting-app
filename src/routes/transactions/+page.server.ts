@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { today } from '#lib/dates.ts';
 import { resolveRange } from '#lib/date-range.ts';
 import { isActiveCategory, listActiveCategories } from '#lib/server/budget/categories.ts';
+import { displayName } from '#lib/server/user.ts';
 import {
 	createTransaction,
 	deleteTransactions,
@@ -34,6 +35,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	]);
 
 	return {
+		displayName: displayName(locals.user),
 		range,
 		today: todayForUser,
 		expenses,

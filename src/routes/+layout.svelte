@@ -3,6 +3,7 @@
 	import { asset } from '$app/paths';
 	import { invalidateAll } from '$app/navigation';
 	import { online } from 'svelte/reactivity/window';
+	import { Toaster } from 'svelte-sonner';
 	import type { LayoutProps } from './$types';
 
 	let { children, data }: LayoutProps = $props();
@@ -43,3 +44,7 @@
 {/if}
 
 {@render children()}
+
+<!-- Toasts (e.g. "Added …", "Deleted …"), in the bottom-left corner on every page. Show them with
+     `toast()` / `toast.success()` from 'svelte-sonner'. Follows the system light/dark setting. -->
+<Toaster position="bottom-left" theme="system" richColors closeButton duration={5000} />

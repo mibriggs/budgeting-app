@@ -1,7 +1,7 @@
-import { redirect, type Actions } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import { today } from '#lib/dates.ts';
-import { auth } from '#lib/server/auth.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
+import { displayName } from '#lib/server/user.ts';
 import type { PageServerLoad } from './login/$types';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -17,16 +17,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	]);
 
 	return {
-		// Fall back to the display name for accounts created before `username` existed.
-		username: locals.user.username ?? locals.user.name,
+		displayName: displayName(locals.user),
 		today: today(locals.user.timezone ?? undefined),
 		categories: { expense: expenseCategories, income: incomeCategories }
 	};
-};
-
-export const actions: Actions = {
-	signOut: async ({ request }) => {
-		await auth.api.signOut({ headers: request.headers });
-		return redirect(302, '/login');
-	}
 };

@@ -18,6 +18,7 @@
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
+	import { focusCalendarDay } from '#lib/calendar.ts';
 	import { categoryIcon } from '#lib/category-icons.ts';
 	import { Temporal, type PlainDate } from '#lib/dates.ts';
 	import { formatDate } from '#lib/date-range.ts';
@@ -55,6 +56,7 @@
 	let categoryId = $state('');
 	let date = $state<DateValue>(new CalendarDate(2000, 1, 1));
 	let dateOpen = $state(false);
+	let datePopover = $state<HTMLElement | null>(null);
 	let errors = $state<Partial<Record<Field, string>>>({});
 	let formError = $state('');
 	let pending = $state(false);
@@ -208,6 +210,8 @@
 							</Popover.Trigger>
 							<Popover.Portal>
 								<Popover.Content
+									bind:ref={datePopover}
+									onOpenAutoFocus={(event) => focusCalendarDay(event, datePopover)}
 									sideOffset={6}
 									align="start"
 									collisionPadding={8}
