@@ -3,6 +3,7 @@
 	phones). Each section is its own route under /settings.
 -->
 <script lang="ts">
+	import Repeat from '@lucide/svelte/icons/repeat';
 	import Tags from '@lucide/svelte/icons/tags';
 	import Wallet from '@lucide/svelte/icons/wallet';
 	import { page } from '$app/state';
@@ -13,8 +14,9 @@
 	let { children, data }: LayoutProps = $props();
 
 	const sections = [
-		{ href: resolve('/settings/categories'), label: 'Categories', icon: Tags },
-		{ href: resolve('/settings/budgets'), label: 'Budgets', icon: Wallet }
+		{ href: resolve('/settings/budgets'), label: 'Budgets', icon: Wallet },
+		{ href: resolve('/settings/recurring'), label: 'Recurring', icon: Repeat },
+		{ href: resolve('/settings/categories'), label: 'Categories', icon: Tags }
 	];
 </script>
 
