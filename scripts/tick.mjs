@@ -14,10 +14,8 @@ const every = everyIndex === -1 ? 0 : Number(process.argv[everyIndex + 1]);
 
 async function tick() {
 	try {
-		const res = await fetch(url, {
-			method: 'POST',
-			headers: { authorization: `Bearer ${secret}` }
-		});
+		// GET, like the cron-job.org job (a form-style POST is refused by SvelteKit in production).
+		const res = await fetch(url, { headers: { authorization: `Bearer ${secret}` } });
 		console.log(new Date().toLocaleTimeString(), res.status, await res.text());
 	} catch (err) {
 		console.error(new Date().toLocaleTimeString(), 'failed:', err.message);

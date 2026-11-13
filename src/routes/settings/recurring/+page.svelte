@@ -489,7 +489,7 @@
 							<Select.Portal>
 								<Select.Content
 									sideOffset={4}
-									class="z-[60] max-h-72 w-(--bits-select-anchor-width) min-w-48 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-900"
+									class="z-60 max-h-72 w-(--bits-select-anchor-width) min-w-48 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-900"
 								>
 									<Select.Viewport>
 										{#each categories as category (category.id)}
@@ -657,7 +657,7 @@
 						<Select.Portal>
 							<Select.Content
 								sideOffset={4}
-								class="z-[60] max-h-72 w-(--bits-select-anchor-width) min-w-48 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-900"
+								class="z-60 max-h-72 w-(--bits-select-anchor-width) min-w-48 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg dark:border-gray-700 dark:bg-gray-900"
 							>
 								<Select.Viewport>
 									{#each HOURS as hour (hour.value)}
