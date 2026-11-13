@@ -227,7 +227,7 @@ export type DueRow = {
  * Pure: the charges due by `today` for each cadence and where each cadence's progress moves to.
  * No I/O, so the scheduled job can reuse it for all users at once.
  */
-export function planCharges(rows: DueRow[], todayFor: (row: DueRow) => PlainDate) {
+export function planCharges<R extends DueRow>(rows: R[], todayFor: (row: R) => PlainDate) {
 	const charges: (typeof expense.$inferInsert)[] = [];
 	const progress: { scheduleId: string; through: PlainDate }[] = [];
 	for (const row of rows) {

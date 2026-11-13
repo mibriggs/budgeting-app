@@ -26,6 +26,7 @@
 		"db:studio": "drizzle-kit studio",
 		"db:sample": "node --env-file=.env scripts/sample-data.mjs",
 		"db:sample:clear": "node --env-file=.env scripts/sample-data.mjs --clear",
+		"tick": "node --env-file-if-exists=.env scripts/tick.mjs",
 		"auth:schema": "auth generate --config src/lib/server/auth.ts --output src/lib/server/db/auth.schema.ts --yes"
 	},
 	"devDependencies": {

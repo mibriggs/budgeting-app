@@ -15,6 +15,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { enhance } from '$app/forms';
+	import { resolve } from '$app/paths';
 	import DatePicker from '#lib/components/DatePicker.svelte';
 	import { categoryIcon } from '#lib/category-icons.ts';
 	import { Temporal, type PlainDate } from '#lib/dates.ts';
@@ -42,7 +43,7 @@
 	let { data }: PageProps = $props();
 	const today = $derived(data.today);
 
-	// Reminders go out on the hour you pick (within about 15 minutes); default noon.
+	// Reminders go out on the hour you pick (within a few minutes; cron-job.org calls every 5); default noon.
 	const DEFAULT_REMIND_HOUR = 12;
 	function hourLabel(h: number): string {
 		if (h === 0) return '12 AM (midnight)';
@@ -356,8 +357,13 @@
 
 	<p class="mt-3 flex items-start gap-1.5 text-xs text-gray-500 dark:text-gray-400">
 		<Bell class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
-		Reminders the day before and the day of, at the time you pick, will come once notifications are set
-		up.
+		<span>
+			You’ll get a reminder the day before and the day of, at the time you pick, on devices with
+			<a
+				href={resolve('/settings/notifications')}
+				class="underline hover:text-gray-900 dark:hover:text-gray-100">notifications turned on</a
+			>.
+		</span>
 	</p>
 </section>
 
@@ -671,7 +677,7 @@
 						</Select.Portal>
 					</Select.Root>
 					<p id="r-remind-help" class="text-xs text-gray-500 dark:text-gray-400">
-						Sent the day before and the day it’s due, within about 15 minutes of this time.
+						Sent the day before and the day it’s due, within a few minutes of this time.
 					</p>
 				</div>
 

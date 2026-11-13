@@ -54,5 +54,10 @@ export const variables = defineEnvVars({
 		description:
 			'A contact for push services if something goes wrong, e.g. `mailto:you@example.com`.',
 		schema: (value) => value?.trim() || undefined
+	},
+	CRON_SECRET: {
+		description:
+			'Secret the scheduler (cron-job.org) sends as `Authorization: Bearer …` to /api/cron/recurring. Generate with `openssl rand -base64 32`. Unset means the endpoint refuses every call.',
+		schema: (value) => value?.trim() || undefined
 	}
 });

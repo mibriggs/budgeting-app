@@ -78,43 +78,85 @@ export async function removeDevice(userId: string, by: { endpoint: string } | { 
  * are deleted. Returns how many were sent, failed and removed.
  */
 export async function notify(userId: string, payload: PushPayload, only?: { endpoint: string }) {
-	if (!pushConfigured) return { sent: 0, failed: 0, removed: 0 };
+	return notifyMany([{ userId, payload }], only);
+}
+
+/** At most this many pushes in flight at once. */
+const SEND_CONCURRENCY = 10;
+
+/**
+ * Sends several messages, each to all of its user's devices: one query for every user's
+ * devices, then all sends in parallel (a few at a time), then one delete for devices that are
+ * gone. Used by the scheduled tick to send everyone's reminders together.
+ */
+export async function notifyMany(
+	messages: { userId: string; payload: PushPayload }[],
+	only?: { endpoint: string }
+) {
+	if (!pushConfigured || messages.length === 0) return { sent: 0, failed: 0, removed: 0 };
+	const userIds = [...new Set(messages.map((m) => m.userId))];
 	const devices = await db
 		.select()
 		.from(pushSubscription)
 		.where(
 			and(
-				eq(pushSubscription.userId, userId),
+				inArray(pushSubscription.userId, userIds),
 				only ? eq(pushSubscription.endpoint, only.endpoint) : undefined
 			)
 		);
 
-	const body = JSON.stringify(payload);
-	const results = await Promise.allSettled(
-		devices.map((d) =>
-			webpush.sendNotification(
-				{ endpoint: d.endpoint, keys: { p256dh: d.p256dh, auth: d.auth } },
-				body,
-				// Keep trying to deliver for a day (e.g. a phone that's off), then give up.
-				{ TTL: 60 * 60 * 24, urgency: 'normal' }
-			)
-		)
+	const jobs = messages.flatMap((m) =>
+		devices
+			.filter((d) => d.userId === m.userId)
+			.map((device) => ({ device, body: JSON.stringify(m.payload) }))
+	);
+	const results = await settleLimited(
+		jobs.map(
+			({ device, body }) =>
+				() =>
+					webpush.sendNotification(
+						{ endpoint: device.endpoint, keys: { p256dh: device.p256dh, auth: device.auth } },
+						body,
+						// Keep trying to deliver for a day (e.g. a phone that's off), then give up.
+						{ TTL: 60 * 60 * 24, urgency: 'normal' }
+					)
+		),
+		SEND_CONCURRENCY
 	);
 
-	const gone: string[] = [];
+	const gone = new Set<string>();
 	let sent = 0;
 	let failed = 0;
 	results.forEach((result, i) => {
 		if (result.status === 'fulfilled') return sent++;
 		const status = result.reason instanceof WebPushError ? result.reason.statusCode : null;
-		if (status === 404 || status === 410) gone.push(devices[i].id);
+		if (status === 404 || status === 410) gone.add(jobs[i].device.id);
 		else {
 			failed++;
-			console.error('Push failed', status, devices[i].label, result.reason);
+			console.error('Push failed', status, jobs[i].device.label, result.reason);
 		}
 	});
-	if (gone.length > 0) await db.delete(pushSubscription).where(inArray(pushSubscription.id, gone));
-	return { sent, failed, removed: gone.length };
+	if (gone.size > 0)
+		await db.delete(pushSubscription).where(inArray(pushSubscription.id, [...gone]));
+	return { sent, failed, removed: gone.size };
+}
+
+/** Like Promise.allSettled over task functions, running at most `limit` at a time. */
+async function settleLimited<T>(tasks: (() => Promise<T>)[], limit: number) {
+	const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+	let next = 0;
+	const worker = async () => {
+		while (next < tasks.length) {
+			const i = next++;
+			try {
+				results[i] = { status: 'fulfilled', value: await tasks[i]() };
+			} catch (reason) {
+				results[i] = { status: 'rejected', reason };
+			}
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+	return results;
 }
 
 // ---------------------------------------------------------------------------

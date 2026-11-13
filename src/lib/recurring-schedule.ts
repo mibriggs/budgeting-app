@@ -140,3 +140,10 @@ export function chargesPerMonth({ count, unit }: Cadence): number {
 	const perMonth = { day: 365.25 / 12, week: 365.25 / 12 / 7, month: 1, year: 1 / 12 }[unit];
 	return perMonth / count;
 }
+
+/** True when `date` is one of the cadence's charge days (and not after `until`). */
+export function isOccurrence(c: Cadence, date: PlainDate, until?: PlainDate | null): boolean {
+	return (
+		occurrencesBetween(c, { after: date.subtract({ days: 1 }), through: date, until }).length > 0
+	);
+}

@@ -336,8 +336,8 @@
 		{/if}
 
 		<p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
-			What you’ll get: reminders the day before and the day each recurring expense is due, at the
-			time you pick for it. Those start once reminders are set up; for now, only tests are sent.
+			What you’ll get: a reminder the day before and the day each recurring expense is due, at the
+			time you pick for it in Settings → Recurring.
 		</p>
 	{/if}
 </section>
