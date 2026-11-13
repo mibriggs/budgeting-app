@@ -134,6 +134,13 @@ export const expense = sqliteTable(
 		purchaseDate: plainDate('purchase_date').notNull(),
 		amountCents: integer('amount_cents').notNull(),
 		notes: text('notes'),
+		// Set when a recurring expense created this charge (see recurring_schedule below). Removing
+		// the cadence keeps the expense and clears the link. Single-column FK, checked in code,
+		// because adding a composite one would mean rebuilding this table.
+		recurringScheduleId: text('recurring_schedule_id').references(() => recurringSchedule.id, {
+			onDelete: 'set null'
+		}),
+		occurrenceDate: plainDate('occurrence_date'),
 		...timestamps
 	},
 	(t) => [
@@ -148,7 +155,10 @@ export const expense = sqliteTable(
 		index('expense_category_date_idx').on(t.categoryId, t.purchaseDate),
 		check('expense_name_not_blank', notBlank(t.name)),
 		check('expense_amount_positive', sql`${t.amountCents} > 0`),
-		check('expense_purchase_date_valid', isCalendarDate(t.purchaseDate))
+		check('expense_purchase_date_valid', isCalendarDate(t.purchaseDate)),
+		check('expense_occurrence_date_valid', isCalendarDate(t.occurrenceDate)),
+		// A recurring charge can only be created once, however many times generation runs.
+		uniqueIndex('expense_recurring_occurrence_unique').on(t.recurringScheduleId, t.occurrenceDate)
 	]
 );
 
@@ -177,5 +187,122 @@ export const income = sqliteTable(
 		check('income_name_not_blank', notBlank(t.name)),
 		check('income_amount_positive', sql`${t.amountCents} > 0`),
 		check('income_received_date_valid', isCalendarDate(t.receivedDate))
+	]
+);
+
+// ---------------------------------------------------------------------------
+// Recurring expenses
+//
+// What repeats (recurring_expense) and when (recurring_schedule: one or more cadences, each a
+// start date plus "every N days/weeks/months/years"). Charges are created as ordinary expenses
+// linked back to their cadence. See src/lib/recurring-schedule.ts for the date rules.
+
+export const recurringExpense = sqliteTable(
+	'recurring_expense',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		categoryId: text('category_id').notNull(),
+		name: text('name').notNull(),
+		amountCents: integer('amount_cents').notNull(),
+		notes: text('notes'),
+		/** No charges after this day. */
+		endDate: plainDate('end_date'),
+		/** Set while paused: no charges or reminders. */
+		pausedAt: integer('paused_at', { mode: 'timestamp_ms' }),
+		/** When reminders go out, in minutes after midnight in the user's time zone (720 = noon). */
+		remindAtMinutes: integer('remind_at_minutes').notNull().default(720),
+		...timestamps
+	},
+	(t) => [
+		// A category with recurring expenses can't be deleted (archive it instead).
+		foreignKey({
+			name: 'recurring_expense_category_owner_fk',
+			columns: [t.categoryId, t.userId],
+			foreignColumns: [expenseCategory.id, expenseCategory.userId]
+		}).onDelete('no action'),
+		index('recurring_expense_user_idx').on(t.userId),
+		check('recurring_expense_name_not_blank', notBlank(t.name)),
+		check('recurring_expense_amount_positive', sql`${t.amountCents} > 0`),
+		check('recurring_expense_end_date_valid', isCalendarDate(t.endDate)),
+		check('recurring_expense_remind_at_valid', sql`${t.remindAtMinutes} BETWEEN 0 AND 1439`)
+	]
+);
+
+export const recurringSchedule = sqliteTable(
+	'recurring_schedule',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		recurringExpenseId: text('recurring_expense_id')
+			.notNull()
+			.references(() => recurringExpense.id, { onDelete: 'cascade' }),
+		startDate: plainDate('start_date').notNull(),
+		intervalCount: integer('interval_count').notNull(),
+		intervalUnit: text('interval_unit', { enum: ['day', 'week', 'month', 'year'] }).notNull(),
+		/**
+		 * Charges on or before this day have been created (or deliberately skipped). Set to the day
+		 * before a cadence is saved, so past charges are never added.
+		 */
+		generatedThrough: plainDate('generated_through'),
+		...timestamps
+	},
+	(t) => [
+		index('recurring_schedule_expense_idx').on(t.recurringExpenseId),
+		check('recurring_schedule_start_valid', isCalendarDate(t.startDate)),
+		check('recurring_schedule_generated_valid', isCalendarDate(t.generatedThrough)),
+		check('recurring_schedule_count_range', sql`${t.intervalCount} BETWEEN 1 AND 99`),
+		check(
+			'recurring_schedule_unit_valid',
+			sql`${t.intervalUnit} IN ('day', 'week', 'month', 'year')`
+		)
+	]
+);
+
+/** One row per reminder sent, claimed before sending so a reminder goes out only once. */
+export const reminderSent = sqliteTable(
+	'reminder_sent',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		scheduleId: text('schedule_id')
+			.notNull()
+			.references(() => recurringSchedule.id, { onDelete: 'cascade' }),
+		occurrenceDate: plainDate('occurrence_date').notNull(),
+		kind: text('kind', { enum: ['day-before', 'day-of'] }).notNull(),
+		...timestamps
+	},
+	(t) => [
+		unique('reminder_sent_once').on(t.scheduleId, t.occurrenceDate, t.kind),
+		check('reminder_sent_date_valid', isCalendarDate(t.occurrenceDate)),
+		check('reminder_sent_kind_valid', sql`${t.kind} IN ('day-before', 'day-of')`)
+	]
+);
+
+// ---------------------------------------------------------------------------
+// Push notifications
+//
+// One row per browser on a device that turned notifications on (Settings → Notifications).
+// The endpoint is the browser's unique push address, so it identifies the device; if another
+// account turns it on in the same browser, the row moves to that account.
+
+export const pushSubscription = sqliteTable(
+	'push_subscription',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		endpoint: text('endpoint').notNull().unique(),
+		/** The browser's public key and auth secret, used to encrypt each message to it. */
+		p256dh: text('p256dh').notNull(),
+		auth: text('auth').notNull(),
+		/** e.g. "iPhone · Safari", from the browser's user agent when it was turned on. */
+		label: text('label').notNull(),
+		...timestamps
+	},
+	(t) => [
+		index('push_subscription_user_idx').on(t.userId),
+		check('push_subscription_endpoint_https', sql`${t.endpoint} LIKE 'https://%'`)
 	]
 );

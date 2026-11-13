@@ -41,6 +41,7 @@
 		"@tailwindcss/vite": "^4.3.0",
 		"@tanstack/virtual-core": "3.19.7",
 		"@types/node": "^24",
+		"@types/web-push": "3.6.4",
 		"auth": "^1.6.24",
 		"better-auth": "^1.6.24",
 		"bits-ui": "2.20.2",
@@ -62,5 +63,8 @@
 		"typescript": "^6.0.3",
 		"typescript-eslint": "^8.60.1",
 		"vite": "^8.3.0"
+	},
+	"dependencies": {
+		"web-push": "3.6.7"
 	}
 }

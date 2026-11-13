@@ -37,7 +37,7 @@ export async function isActiveCategory(userId: string, kind: TransactionKind, ca
 
 /**
  * All of a user's categories of one kind for the Categories page: active ones in their order,
- * then archived ones by name, each with how many entries use it.
+ * then archived ones by name, each with how many entries and recurring expenses use it.
  */
 export async function listCategoriesForSettings(userId: string, kind: TransactionKind) {
 	const table = tables[kind];
@@ -46,13 +46,21 @@ export async function listCategoriesForSettings(userId: string, kind: Transactio
 	const uses = sql<number>`(
 		select count(*) from ${sql.raw(kind)} e where e.category_id = ${sql.raw(`${kind}_category`)}.id
 	)`;
+	// Only expenses repeat. A category a recurring expense uses can't be deleted either.
+	const recurring =
+		kind === 'expense'
+			? sql<number>`(
+				select count(*) from recurring_expense r where r.category_id = expense_category.id
+			)`
+			: sql<number>`0`;
 	const rows = await db
 		.select({
 			id: table.id,
 			name: table.name,
 			icon: table.icon,
 			archived: sql<boolean>`${table.archivedAt} is not null`.mapWith(Boolean),
-			uses
+			uses,
+			recurring
 		})
 		.from(table)
 		.where(eq(table.userId, userId))
@@ -62,6 +70,9 @@ export async function listCategoriesForSettings(userId: string, kind: Transactio
 		archived: rows.filter((r) => r.archived).sort((a, b) => a.name.localeCompare(b.name))
 	};
 }
+
+/** Has entries or recurring expenses, so it can only be archived, not deleted. */
+const inUse = (c: { uses: number; recurring: number }) => c.uses + c.recurring > 0;
 
 export type SettingsCategory = Awaited<
 	ReturnType<typeof listCategoriesForSettings>
@@ -115,7 +126,7 @@ export async function planCategoryChanges(
 	const removed = new Set(changes.remove);
 	const restored = new Set(changes.restore);
 	const others = [...stored.archived, ...stored.active.filter((c) => removed.has(c.id))].filter(
-		(c) => (c.archived ? !restored.has(c.id) : c.uses > 0)
+		(c) => (c.archived ? !restored.has(c.id) : inUse(c))
 	);
 	const existing = [
 		...active.map((r) => ({ id: r.id, name: r.name, archived: false })),
@@ -141,7 +152,7 @@ export async function planCategoryChanges(
 	// Removals first, so a removed (deleted) name can be reused by a new category.
 	for (const id of changes.remove) {
 		writes.push(
-			byId.get(id)!.uses > 0
+			inUse(byId.get(id)!)
 				? db.update(table).set({ archivedAt: now }).where(mine(id))
 				: db.delete(table).where(mine(id))
 		);

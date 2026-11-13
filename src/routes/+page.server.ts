@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import { summarizeBudgets } from '#lib/budget-status.ts';
 import { today } from '#lib/dates.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
+import { generateDueCharges } from '#lib/server/budget/recurring.ts';
 import {
 	dailySpending,
 	fillMonths,
@@ -29,6 +30,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const lastStart = thisStart.subtract({ months: 1 });
 	const lastEnd = thisStart.subtract({ days: 1 });
 	const trendStart = thisStart.subtract({ months: TREND_MONTHS - 1 });
+
+	// Add any recurring charges that came due (e.g. rent on the 1st) before reading expenses.
+	await generateDueCharges(userId, todayForUser);
 
 	const [expenseCategories, incomeCategories, months, byCategory, thisDaily, lastDaily, limits] =
 		await Promise.all([

@@ -37,5 +37,22 @@ export const variables = defineEnvVars({
 	GITHUB_CLIENT_SECRET: {
 		description:
 			'GitHub OAuth client secret. See [Better Auth GitHub provider](https://www.better-auth.com/docs/authentication/github).'
+	},
+	// Web Push (Settings → Notifications). Generate once with `npx web-push generate-vapid-keys`.
+	// All three are optional: while any is missing, notifications are off and the page says so.
+	VAPID_PUBLIC_KEY: {
+		description:
+			'Web Push public key (from `npx web-push generate-vapid-keys`). Sent to browsers when they subscribe.',
+		schema: (value) => value?.trim() || undefined
+	},
+	VAPID_PRIVATE_KEY: {
+		description:
+			'Web Push private key (from `npx web-push generate-vapid-keys`). Signs every notification; keep it secret.',
+		schema: (value) => value?.trim() || undefined
+	},
+	VAPID_SUBJECT: {
+		description:
+			'A contact for push services if something goes wrong, e.g. `mailto:you@example.com`.',
+		schema: (value) => value?.trim() || undefined
 	}
 });

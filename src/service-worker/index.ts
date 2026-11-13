@@ -6,6 +6,9 @@
 // - Page navigations and SvelteKit data requests (__data.json) go to the network first.
 //   Successful responses are saved, and the saved copy is used when the network fails.
 // - /api/* (Better Auth) and non-GET requests always go to the network.
+//
+// Push notifications (Settings → Notifications): `push` shows what the server sent (see
+// src/lib/server/push.ts); tapping it focuses an open window of the app, or opens one.
 
 import { self } from '$app/service-worker';
 import { immutable, assets, prerendered } from '$app/manifest';
@@ -59,6 +62,43 @@ self.addEventListener('fetch', (event) => {
 	} else if (request.mode === 'navigate' || url.pathname.endsWith('/__data.json')) {
 		event.respondWith(networkFirst(request));
 	}
+});
+
+type PushPayload = { title: string; body: string; url?: string; tag?: string };
+
+self.addEventListener('push', (event) => {
+	let payload: PushPayload;
+	try {
+		payload = event.data?.json() as PushPayload;
+	} catch {
+		payload = { title: 'Budget', body: event.data?.text() ?? '' };
+	}
+	event.waitUntil(
+		self.registration.showNotification(payload.title, {
+			body: payload.body,
+			tag: payload.tag,
+			icon: toUrl('icons/icon-192.png'),
+			badge: toUrl('icons/icon-192.png'),
+			data: { url: payload.url ?? '/' }
+		})
+	);
+});
+
+self.addEventListener('notificationclick', (event) => {
+	event.notification.close();
+	const target = new URL((event.notification.data as { url?: string })?.url ?? '/', scope).href;
+	event.waitUntil(
+		(async () => {
+			const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+			const open = windows.find((w) => new URL(w.url).origin === self.location.origin);
+			if (open) {
+				await open.focus();
+				if (open.url !== target) await open.navigate(target);
+			} else {
+				await self.clients.openWindow(target);
+			}
+		})()
+	);
 });
 
 async function cacheFirst(request: Request) {

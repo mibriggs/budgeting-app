@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { today } from '#lib/dates.ts';
 import { resolveRange } from '#lib/date-range.ts';
 import { isActiveCategory, listActiveCategories } from '#lib/server/budget/categories.ts';
+import { generateDueCharges } from '#lib/server/budget/recurring.ts';
 import { displayName } from '#lib/server/user.ts';
 import {
 	createTransaction,
@@ -27,6 +28,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const userId = locals.user.id;
 	const todayForUser = today(locals.user.timezone ?? undefined);
 	const range = resolveRange(url.searchParams, todayForUser);
+	// Add any recurring charges that came due (e.g. rent on the 1st) before reading expenses.
+	await generateDueCharges(userId, todayForUser);
+
 	const [expenses, incomes, expenseCategories, incomeCategories] = await Promise.all([
 		listExpenses(userId, range),
 		listIncome(userId, range),

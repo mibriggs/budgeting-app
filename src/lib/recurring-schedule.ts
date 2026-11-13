@@ -41,12 +41,35 @@ export function occurrencesFrom(
 		n = Math.max(0, Math.floor(elapsed / c.count) - 1);
 	}
 	const out: PlainDate[] = [];
-	for (let guard = 0; out.length < limit && guard < 1000; guard++, n++) {
+	for (let guard = 0; out.length < limit && guard < limit + 10; guard++, n++) {
 		const d = occurrence(c, n);
 		if (until && compare(d, until) > 0) break;
 		if (compare(d, from) >= 0) out.push(d);
 	}
 	return out;
+}
+
+/** The most charges one cadence can produce in one call (10 years of daily charges). */
+const MAX_BATCH = 3660;
+
+/**
+ * Charges after `after` (or from the start date when null) up to and including `through`, and
+ * not after `until` (the end date). The generator uses this to find what's due since a
+ * cadence's `generatedThrough` (which starts at the day before it's saved, so past charges are
+ * never added).
+ */
+export function occurrencesBetween(
+	c: Cadence,
+	{
+		after,
+		through,
+		until
+	}: { after: PlainDate | null; through: PlainDate; until?: PlainDate | null }
+): PlainDate[] {
+	const from = after ? after.add({ days: 1 }) : c.startDate;
+	const last = until && compare(until, through) < 0 ? until : through;
+	if (compare(from, last) > 0) return [];
+	return occurrencesFrom(c, from, MAX_BATCH, last);
 }
 
 /**

@@ -43,7 +43,10 @@
 
 	let { data }: PageProps = $props();
 
-	type Stored = { id: string; name: string; icon: string | null; uses: number };
+	type Stored = { id: string; name: string; icon: string | null; uses: number; recurring: number };
+	// Entries or recurring expenses use it, so removing it archives instead of deleting.
+	const inUse = (c: Stored) => c.uses + c.recurring > 0;
+	const recurringText = (n: number) => `${n} recurring ${n === 1 ? 'expense' : 'expenses'}`;
 	type Row = Stored & { isNew: boolean; remove: boolean };
 	type ArchivedRow = Stored & { restore: boolean };
 	type Draft = Record<Kind, { active: Row[]; archived: ArchivedRow[] }>;
@@ -88,7 +91,7 @@
 	);
 
 	const key = categoryNameKey;
-	const deletes = (r: Row) => r.remove && r.uses === 0;
+	const deletes = (r: Row) => r.remove && !inUse(r);
 
 	type RowError = { text: string; restoreId?: string };
 	function rowError(kind: Kind, row: Row): RowError | null {
@@ -122,9 +125,11 @@
 	function notes(row: Row, index: number): string | null {
 		if (row.isNew) return 'New';
 		if (row.remove)
-			return row.uses > 0
-				? `Will be archived · its ${row.uses} ${row.uses === 1 ? 'entry keeps' : 'entries keep'} it`
-				: 'Will be deleted · never used';
+			return row.recurring > 0
+				? `Will be archived · ${recurringText(row.recurring)} still ${row.recurring === 1 ? 'uses' : 'use'} it`
+				: row.uses > 0
+					? `Will be archived · its ${row.uses} ${row.uses === 1 ? 'entry keeps' : 'entries keep'} it`
+					: 'Will be deleted · never used';
 		const orig = stored[row.id];
 		const parts: string[] = [];
 		if (tidyCategoryName(row.name) !== orig.name) parts.push(`Was “${orig.name}”`);
@@ -178,7 +183,15 @@
 
 	async function add(kind: Kind) {
 		const id = `${NEW_CATEGORY_PREFIX}${crypto.randomUUID()}`;
-		draft[kind].active.push({ id, name: '', icon: 'tag', uses: 0, isNew: true, remove: false });
+		draft[kind].active.push({
+			id,
+			name: '',
+			icon: 'tag',
+			uses: 0,
+			recurring: 0,
+			isNew: true,
+			remove: false
+		});
 		await tick();
 		document.getElementById(`name-${id}`)?.focus();
 	}
@@ -618,13 +631,13 @@
 									<Undo2 class="size-4" aria-hidden="true" />
 								</button>
 							{:else}
-								{@const archives = row.uses > 0}
+								{@const archives = inUse(row)}
 								<button
 									type="button"
 									class={[iconButton, 'hover:text-red-700! dark:hover:text-red-400!']}
 									aria-label="{archives ? 'Archive' : 'Delete'} {row.name || 'new category'}"
 									title={archives
-										? `Archive (${row.uses} ${row.uses === 1 ? 'entry uses' : 'entries use'} it)`
+										? `Archive (used by ${[row.uses > 0 && `${row.uses} ${row.uses === 1 ? 'entry' : 'entries'}`, row.recurring > 0 && recurringText(row.recurring)].filter(Boolean).join(' and ')})`
 										: row.isNew
 											? 'Remove'
 											: 'Delete (never used)'}
@@ -685,7 +698,12 @@
 									>
 										{a.restore
 											? 'Will be restored to the end of the list'
-											: `${a.uses} ${a.uses === 1 ? 'entry' : 'entries'}`}
+											: [
+													`${a.uses} ${a.uses === 1 ? 'entry' : 'entries'}`,
+													a.recurring > 0 && `still used by ${recurringText(a.recurring)}`
+												]
+													.filter(Boolean)
+													.join(' · ')}
 									</span>
 								</div>
 								<button

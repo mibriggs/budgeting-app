@@ -50,6 +50,20 @@
       "when": 1794419996663,
       "tag": "0006_category_everyday",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794538917967,
+      "tag": "0007_recurring",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794547244987,
+      "tag": "0008_push_subscription",
+      "breakpoints": true
     }
   ]
 }

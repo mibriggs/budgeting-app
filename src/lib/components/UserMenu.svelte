@@ -2,7 +2,8 @@
 	@component
 	Avatar icon + name that opens a menu with Transactions, Settings, a Light/Dark/System theme
 	picker and Sign Out. Works on any page:
-	signing out posts to /sign-out and clears the offline page cache first.
+	signing out posts to /sign-out and clears the offline page cache first. It also turns off this
+	device's notifications, so whoever signs in next on this browser doesn't get them.
 -->
 <script lang="ts">
 	import CircleUserRound from '@lucide/svelte/icons/circle-user-round';
@@ -21,6 +22,19 @@
 	let { name }: { name: string } = $props();
 
 	let signOutForm = $state<HTMLFormElement | null>(null);
+
+	/** This browser's push subscription, if notifications are on here (removed on sign-out). */
+	async function pushSubscription() {
+		if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+		const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000));
+		const reg = await Promise.race([navigator.serviceWorker.ready, timeout]);
+		return (await reg?.pushManager.getSubscription()) ?? null;
+	}
+	let pushEndpoint = $state('');
+	// Looked up ahead of time: the sign-out form's submit handler can't wait for it.
+	$effect(() => {
+		pushSubscription().then((sub) => (pushEndpoint = sub?.endpoint ?? ''));
+	});
 
 	const themeOptions: { value: ThemeChoice; label: string; icon: typeof Sun }[] = [
 		{ value: 'light', label: 'Light', icon: Sun },
@@ -101,7 +115,11 @@
 	hidden
 	use:enhance={() =>
 		async ({ update }) => {
+			// The server removed the saved subscription; drop the browser's copy too.
+			await (await pushSubscription())?.unsubscribe().catch(() => {});
 			await clearPageCaches();
 			await update();
 		}}
-></form>
+>
+	<input type="hidden" name="pushEndpoint" value={pushEndpoint} />
+</form>
