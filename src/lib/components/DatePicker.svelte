@@ -1,13 +1,16 @@
 <!--
 	@component
 	A date field: a button showing the date ("Nov 12, 2026") that opens a Bits UI calendar in a
-	popover, with month and year dropdowns. Works inside dialogs (the popover sits above them).
+	popover, with ‹ › month arrows around month and year dropdowns (like the transactions
+	page's custom range). The field doesn't shrink when pressed, since it acts as an input. Works inside dialogs (the popover sits above them).
 	Same look as the add-entry dialog's date field.
 
 	<DatePicker bind:value={start} labelledby="start-label" min={...} max={...} />
 -->
 <script lang="ts">
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import { CalendarDate, parseDate as parseCalendarDate } from '@internationalized/date';
 	import { Calendar, Popover } from 'bits-ui';
 	import { focusCalendarDay } from '#lib/calendar.ts';
@@ -48,6 +51,7 @@
 	// Newest first, like the add dialog.
 	const years = $derived(Array.from({ length: max.year - min.year + 1 }, (_, i) => max.year - i));
 
+	const arrow = 'rounded-md p-1.5 hover:bg-gray-100 disabled:opacity-30 dark:hover:bg-gray-800';
 	const select =
 		'cursor-pointer rounded-md border-0 bg-transparent py-1 pr-7 pl-2 text-sm font-semibold hover:bg-gray-100 focus:ring-2 focus:ring-gray-400 dark:bg-transparent dark:hover:bg-gray-800';
 	const day = [
@@ -61,8 +65,10 @@
 </script>
 
 <Popover.Root bind:open>
+	<!-- data-no-press: a field, not a button, so it skips the press-to-shrink effect. -->
 	<Popover.Trigger
 		{id}
+		data-no-press
 		class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-900 focus:border-gray-500 focus:ring-gray-500 aria-invalid:border-red-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 {className}"
 		aria-labelledby={labelledby ? `${labelledby} ${valueId}` : undefined}
 		aria-describedby={describedby}
@@ -97,10 +103,19 @@
 				fixedWeeks
 			>
 				{#snippet children({ months, weekdays })}
-					<Calendar.Header class="mb-2 flex items-center justify-center gap-1">
+					<Calendar.Header class="mb-2 flex items-center justify-between gap-1">
+						<Calendar.PrevButton class={arrow} aria-label="Previous month">
+							<ChevronLeft class="size-4" aria-hidden="true" />
+						</Calendar.PrevButton>
+						<!-- Announced to screen readers when the month changes; the selects are the visible heading. -->
 						<Calendar.Heading class="sr-only" />
-						<Calendar.MonthSelect monthFormat="short" class={select} />
-						<Calendar.YearSelect {years} class={select} />
+						<div class="flex items-center">
+							<Calendar.MonthSelect monthFormat="short" class={select} />
+							<Calendar.YearSelect {years} class={select} />
+						</div>
+						<Calendar.NextButton class={arrow} aria-label="Next month">
+							<ChevronRight class="size-4" aria-hidden="true" />
+						</Calendar.NextButton>
 					</Calendar.Header>
 					{#each months as month (month.value)}
 						<Calendar.Grid>

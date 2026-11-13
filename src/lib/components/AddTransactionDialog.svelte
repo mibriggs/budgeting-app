@@ -236,7 +236,9 @@
 						bind:value={categoryId}
 						items={categories.map((c) => ({ value: c.id, label: c.name }))}
 					>
+						<!-- data-no-press: a field, not a button, so it skips the press-to-shrink effect. -->
 						<Select.Trigger
+							data-no-press
 							class="{input} flex items-center gap-2 border px-3 py-2 text-left"
 							aria-labelledby="add-category-label"
 							aria-invalid={errors.categoryId ? true : undefined}

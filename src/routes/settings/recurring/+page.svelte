@@ -464,7 +464,9 @@
 							bind:value={form.categoryId}
 							items={categories.map((c) => ({ value: c.id, label: c.name }))}
 						>
+							<!-- data-no-press: a field, not a button, so it skips the press-to-shrink effect. -->
 							<Select.Trigger
+								data-no-press
 								class="{input} flex items-center gap-2 border px-3 py-2 text-left"
 								aria-labelledby="r-category-label"
 								aria-invalid={show('category') ? true : undefined}
@@ -635,7 +637,9 @@
 				<div class="flex flex-col gap-1">
 					<span id="r-remind-label" class={fieldLabel}>Reminder time</span>
 					<Select.Root type="single" bind:value={form.remindHour} items={HOURS}>
+						<!-- data-no-press: a field, not a button, so it skips the press-to-shrink effect. -->
 						<Select.Trigger
+							data-no-press
 							class="{input} flex items-center gap-2 border px-3 py-2 text-left"
 							aria-labelledby="r-remind-label"
 							aria-describedby="r-remind-help"
