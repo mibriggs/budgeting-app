@@ -7,6 +7,12 @@
    saved choice, or the system setting by default); src/lib/theme.svelte.ts updates it. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* `large:` = an 11-inch iPad in landscape (1180pt) and up: where Settings switches from cards to
+   a sidebar. Kept in step with LARGE_SCREEN in src/lib/media.svelte.ts. */
+@theme {
+	--breakpoint-large: 73.75rem;
+}
+
 @layer base {
 	/* Native controls (selects, scrollbars, date inputs) match the chosen theme. */
 	html {

@@ -16,10 +16,14 @@
 	import { DropdownMenu } from 'bits-ui';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import { createMediaQuery, LARGE_SCREEN } from '#lib/media.svelte.ts';
 	import { clearPageCaches } from '#lib/offline.ts';
 	import { theme, type ThemeChoice } from '#lib/theme.svelte.ts';
 
 	let { name }: { name: string } = $props();
+
+	// Large screens have no Settings overview (the sidebar replaces it), so link to Budgets.
+	const large = createMediaQuery(LARGE_SCREEN);
 
 	let signOutForm = $state<HTMLFormElement | null>(null);
 
@@ -70,7 +74,7 @@
 			</DropdownMenu.Item>
 			<DropdownMenu.Item class={item}>
 				{#snippet child({ props })}
-					<a href={resolve('/settings')} {...props}>
+					<a href={large.current ? resolve('/settings/budgets') : resolve('/settings')} {...props}>
 						<SettingsIcon class="size-4" aria-hidden="true" />
 						Settings
 					</a>

@@ -23,3 +23,6 @@ export function createMediaQuery(query: string) {
 
 /** Tailwind's `sm` breakpoint: the grid shows at this width and up, the compact list below. */
 export const WIDE_SCREEN = '(min-width: 40rem)';
+
+/** The `large:` breakpoint (11-inch iPad in landscape, 1180pt): Settings shows a sidebar here. */
+export const LARGE_SCREEN = '(min-width: 73.75rem)';
