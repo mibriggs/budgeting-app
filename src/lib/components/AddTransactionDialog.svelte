@@ -9,20 +9,13 @@
 <script lang="ts">
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import CalendarIcon from '@lucide/svelte/icons/calendar';
-	import {
-		CalendarDate,
-		parseDate as parseCalendarDate,
-		type DateValue
-	} from '@internationalized/date';
-	import { Calendar, Dialog, Popover, Select } from 'bits-ui';
+	import { Dialog, Select } from 'bits-ui';
 	import { untrack } from 'svelte';
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
-	import { focusCalendarDay } from '#lib/calendar.ts';
 	import { categoryIcon } from '#lib/category-icons.ts';
+	import DatePicker from '#lib/components/DatePicker.svelte';
 	import { Temporal, type PlainDate } from '#lib/dates.ts';
-	import { formatDate } from '#lib/date-range.ts';
 	import type { CategoryOption } from '#lib/server/budget/categories.ts';
 	import type { TransactionKind } from '#lib/server/budget/transactions.ts';
 	import { MAX_NAME_LENGTH, MAX_NOTES_LENGTH, parseAmount } from '#lib/transaction-input.ts';
@@ -56,9 +49,8 @@
 	let amount = $state('');
 	let notes = $state('');
 	let categoryId = $state('');
-	let date = $state<DateValue>(new CalendarDate(2000, 1, 1));
-	let dateOpen = $state(false);
-	let datePopover = $state<HTMLElement | null>(null);
+	// svelte-ignore state_referenced_locally
+	let date = $state<PlainDate | null>(today);
 	let errors = $state<Partial<Record<Field, string>>>({});
 	let formError = $state('');
 	let pending = $state(false);
@@ -98,31 +90,23 @@
 		notes = '';
 		errors = {};
 		formError = '';
-		date = parseCalendarDate(today.toString());
+		date = today;
 		const last = lastCategory[kind];
 		categoryId = last && categories.some((c) => c.id === last) ? last : '';
 	}
 
-	// The calendar runs 1940 to next year (so a payment due in early January can be entered).
-	const thisYear = new Date().getFullYear();
-	const years = Array.from({ length: thisYear + 1 - 1940 + 1 }, (_, i) => thisYear + 1 - i);
-	const minValue = new CalendarDate(1940, 1, 1);
-	const maxValue = new CalendarDate(thisYear + 1, 12, 31);
+	// Dates run 1940 to next year (so a payment due in early January can be entered).
+	const DATE_MIN = Temporal.PlainDate.from('1940-01-01');
+	const DATE_MAX = Temporal.PlainDate.from({
+		year: new Date().getFullYear() + 1,
+		month: 12,
+		day: 31
+	});
 
 	const input =
 		'w-full rounded-md border-gray-300 bg-white text-sm text-gray-900 focus:border-gray-500 focus:ring-gray-500 aria-invalid:border-red-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100';
 	const fieldLabel = 'text-sm font-medium';
 	const errorText = 'text-xs text-red-700 dark:text-red-400';
-	const select =
-		'cursor-pointer rounded-md border-0 bg-transparent py-1 pr-7 pl-2 text-sm font-semibold hover:bg-gray-100 focus:ring-2 focus:ring-gray-400 dark:bg-transparent dark:hover:bg-gray-800';
-	const day = [
-		'relative flex size-9 cursor-pointer items-center justify-center rounded-md text-sm tabular-nums',
-		'hover:bg-gray-100 dark:hover:bg-gray-800',
-		'data-selected:bg-gray-900 data-selected:text-white dark:data-selected:bg-white dark:data-selected:text-gray-900',
-		'data-outside-month:text-gray-300 dark:data-outside-month:text-gray-600',
-		'data-disabled:pointer-events-none data-disabled:opacity-30',
-		'data-today:after:absolute data-today:after:bottom-1 data-today:after:left-1/2 data-today:after:size-1 data-today:after:-translate-x-1/2 data-today:after:rounded-full data-today:after:bg-current data-today:after:opacity-60'
-	].join(' ');
 </script>
 
 <Dialog.Root bind:open>
@@ -148,7 +132,7 @@
 							onCreated({
 								kind,
 								name: name.trim(),
-								date: Temporal.PlainDate.from(date.toString())
+								date: date ?? today
 							});
 							// Stay on the current page (e.g. home) even though the action lives on
 							// /transactions; still reload this page's data.
@@ -232,78 +216,14 @@
 
 					<div class="flex flex-col gap-1">
 						<span id="add-date-label" class={fieldLabel}>Date</span>
-						<input type="hidden" name="date" value={date.toString()} />
-						<Popover.Root bind:open={dateOpen}>
-							<Popover.Trigger
-								class="{input} flex items-center justify-between border px-3 py-2 text-left"
-								aria-labelledby="add-date-label add-date-value"
-								aria-invalid={errors.date ? true : undefined}
-							>
-								<span id="add-date-value"
-									>{formatDate(Temporal.PlainDate.from(date.toString()))}</span
-								>
-								<CalendarIcon class="size-4 text-gray-500" aria-hidden="true" />
-							</Popover.Trigger>
-							<Popover.Portal>
-								<Popover.Content
-									bind:ref={datePopover}
-									onOpenAutoFocus={(event) => focusCalendarDay(event, datePopover)}
-									sideOffset={6}
-									align="start"
-									collisionPadding={8}
-									class="z-[60] rounded-lg border border-gray-200 bg-white p-3 text-gray-900 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
-								>
-									<Calendar.Root
-										type="single"
-										value={date}
-										onValueChange={(value) => {
-											if (!value) return;
-											date = value;
-											dateOpen = false;
-										}}
-										{minValue}
-										{maxValue}
-										preventDeselect
-										weekdayFormat="short"
-										fixedWeeks
-									>
-										{#snippet children({ months, weekdays })}
-											<Calendar.Header class="mb-2 flex items-center justify-center gap-1">
-												<Calendar.Heading class="sr-only" />
-												<Calendar.MonthSelect monthFormat="short" class={select} />
-												<Calendar.YearSelect {years} class={select} />
-											</Calendar.Header>
-											{#each months as month (month.value)}
-												<Calendar.Grid>
-													<Calendar.GridHead>
-														<Calendar.GridRow class="flex">
-															{#each weekdays as weekday (weekday)}
-																<Calendar.HeadCell
-																	class="w-9 text-center text-xs font-normal text-gray-500"
-																>
-																	{weekday.slice(0, 2)}
-																</Calendar.HeadCell>
-															{/each}
-														</Calendar.GridRow>
-													</Calendar.GridHead>
-													<Calendar.GridBody>
-														{#each month.weeks as week, i (i)}
-															<Calendar.GridRow class="flex">
-																{#each week as cellDate (cellDate.toString())}
-																	<Calendar.Cell date={cellDate} month={month.value} class="p-0">
-																		<Calendar.Day class={day} />
-																	</Calendar.Cell>
-																{/each}
-															</Calendar.GridRow>
-														{/each}
-													</Calendar.GridBody>
-												</Calendar.Grid>
-											{/each}
-										{/snippet}
-									</Calendar.Root>
-								</Popover.Content>
-							</Popover.Portal>
-						</Popover.Root>
+						<input type="hidden" name="date" value={date?.toString() ?? ''} />
+						<DatePicker
+							bind:value={date}
+							labelledby="add-date-label"
+							min={DATE_MIN}
+							max={DATE_MAX}
+							invalid={Boolean(errors.date)}
+						/>
 						{#if errors.date}<p class={errorText}>{errors.date}</p>{/if}
 					</div>
 				</div>
