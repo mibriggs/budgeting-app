@@ -89,11 +89,11 @@ export const actions: Actions = {
 		const result = await notify(
 			locals.user.id,
 			{
-				title: 'Budget',
+				title: 'Test notification',
 				body:
 					scope === 'this'
-						? 'Test notification: notifications work on this device.'
-						: 'Test notification sent to all your devices.',
+						? 'Notifications work on this device.'
+						: 'Sent to all your devices with notifications on.',
 				url: '/settings/notifications',
 				tag: 'test'
 			},
