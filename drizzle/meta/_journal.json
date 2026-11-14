@@ -64,6 +64,13 @@
       "when": 1794547244987,
       "tag": "0008_push_subscription",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1794610698969,
+      "tag": "0009_api_token",
+      "breakpoints": true
     }
   ]
 }

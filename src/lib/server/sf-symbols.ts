@@ -1,0 +1,97 @@
+// The SF Symbol (Apple's icon set) shown for each category icon in the Home Screen widget.
+// Scriptable can't draw our Lucide icons, so /api/widget sends the nearest SF Symbol name and
+// the script draws `SFSymbol.named(name)`, falling back to "tag" if the phone doesn't have it.
+//
+// Typed against every category icon, so adding an icon without a symbol fails the type check.
+// Names are from memory of Apple's catalogue and need checking on a phone; a few (cake, popcorn)
+// need iOS 17, where older phones show the fallback.
+
+import type { CategoryIconName } from '#lib/category-icons.ts';
+
+export const SF_SYMBOLS: Record<CategoryIconName, string> = {
+	baby: 'figure.and.child.holdinghands',
+	banknote: 'banknote',
+	bath: 'bathtub',
+	beer: 'mug',
+	bike: 'bicycle',
+	'book-open': 'book',
+	brain: 'brain.head.profile',
+	briefcase: 'briefcase',
+	building: 'building.2',
+	bus: 'bus',
+	cake: 'birthday.cake',
+	camera: 'camera',
+	candy: 'popcorn',
+	car: 'car',
+	'car-taxi-front': 'car.side',
+	coffee: 'cup.and.saucer',
+	coins: 'centsign.circle',
+	'credit-card': 'creditcard',
+	droplet: 'drop',
+	dumbbell: 'dumbbell',
+	film: 'film',
+	flame: 'flame',
+	fuel: 'fuelpump',
+	'gamepad-2': 'gamecontroller',
+	gavel: 'building.columns',
+	gift: 'gift',
+	glasses: 'eyeglasses',
+	'graduation-cap': 'graduationcap',
+	hammer: 'hammer',
+	'hand-coins': 'dollarsign.arrow.circlepath',
+	'hand-heart': 'heart.circle',
+	headphones: 'headphones',
+	heart: 'heart',
+	hotel: 'bed.double',
+	house: 'house',
+	landmark: 'building.columns',
+	laptop: 'laptopcomputer',
+	luggage: 'suitcase',
+	package: 'shippingbox',
+	palette: 'paintpalette',
+	'paw-print': 'pawprint',
+	'pen-tool': 'pencil',
+	percent: 'percent',
+	'piggy-bank': 'dollarsign.circle',
+	pill: 'pills',
+	pizza: 'takeoutbag.and.cup.and.straw',
+	plane: 'airplane',
+	receipt: 'doc.text',
+	repeat: 'repeat',
+	sandwich: 'fork.knife.circle',
+	scissors: 'scissors',
+	shapes: 'square.on.circle',
+	'shield-check': 'checkmark.shield',
+	shirt: 'tshirt',
+	'shopping-bag': 'bag',
+	'shopping-cart': 'cart',
+	smartphone: 'iphone',
+	sofa: 'sofa',
+	sparkles: 'sparkles',
+	'spray-can': 'bubbles.and.sparkles',
+	sprout: 'leaf',
+	'square-parking': 'parkingsign',
+	stethoscope: 'stethoscope',
+	store: 'storefront',
+	tag: 'tag',
+	tent: 'tent',
+	ticket: 'ticket',
+	'toy-brick': 'puzzlepiece',
+	'train-front': 'tram',
+	'tree-pine': 'tree',
+	'trending-up': 'chart.line.uptrend.xyaxis',
+	trophy: 'trophy',
+	tv: 'tv',
+	'utensils-crossed': 'fork.knife',
+	wallet: 'wallet.pass',
+	'washing-machine': 'washer',
+	wifi: 'wifi',
+	wine: 'wineglass',
+	wrench: 'wrench.adjustable',
+	zap: 'bolt'
+};
+
+/** The SF Symbol for a category's icon key ("tag" for none or an unknown key). */
+export function sfSymbolFor(icon: string | null | undefined): string {
+	return icon && Object.hasOwn(SF_SYMBOLS, icon) ? SF_SYMBOLS[icon as CategoryIconName] : 'tag';
+}

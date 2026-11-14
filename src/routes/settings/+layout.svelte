@@ -39,13 +39,16 @@
 			href: resolve('/settings/notifications'),
 			label: 'Notifications',
 			icon: Bell
+		},
+		{
+			id: '/settings/widget',
+			href: resolve('/settings/widget'),
+			label: 'Widget',
+			icon: LayoutGrid
 		}
 	];
 	// Not built yet: listed, muted, not links (same as the "Coming soon" cards).
-	const comingSoon = [
-		{ label: 'Payment methods', icon: CreditCard },
-		{ label: 'Widget', icon: LayoutGrid }
-	];
+	const comingSoon = [{ label: 'Payment methods', icon: CreditCard }];
 	// Compared by route id: during server rendering resolve() gives relative paths ("./settings"),
 	// which never equal the URL's pathname.
 	const onOverview = $derived(page.route.id === '/settings');

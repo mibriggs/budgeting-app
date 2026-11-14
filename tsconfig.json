@@ -11,5 +11,5 @@
 		"eslint.config.js",
 		"drizzle.config.ts"
 	],
-	"exclude": ["src/service-worker"]
+	"exclude": ["src/service-worker", "src/lib/widget-scripts/*.js"]
 }

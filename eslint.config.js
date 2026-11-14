@@ -34,6 +34,16 @@ export default defineConfig(
 		}
 	},
 	{
+		// Scriptable widget code (Settings → Widget): plain scripts joined into one file, run by
+		// the Scriptable app with its own globals, so each file alone has "unused" helpers.
+		files: ['src/lib/widget-scripts/*.js'],
+		languageOptions: {
+			sourceType: 'script',
+			parserOptions: { ecmaFeatures: { globalReturn: true } }
+		},
+		rules: { '@typescript-eslint/no-unused-vars': 'off', 'no-useless-assignment': 'off' }
+	},
+	{
 		// Override or add rule settings here, such as:
 		// 'svelte/button-has-type': 'error'
 		rules: {}

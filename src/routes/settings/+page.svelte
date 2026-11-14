@@ -23,7 +23,8 @@
 		| '/settings/budgets'
 		| '/settings/recurring'
 		| '/settings/categories'
-		| '/settings/notifications';
+		| '/settings/notifications'
+		| '/settings/widget';
 
 	let { data }: PageProps = $props();
 
@@ -55,6 +56,14 @@
 		} catch {
 			push = 'unavailable';
 		}
+	});
+	const widgetLastUsed = $derived.by(() => {
+		const at = data.widget.lastUsedAt;
+		if (!at) return 'Not used yet';
+		const minutes = (Date.now() - at.getTime()) / 60_000;
+		if (minutes < 90) return 'Used in the last hour';
+		if (minutes < 60 * 24) return `Used ${Math.round(minutes / 60)} hours ago`;
+		return `Used ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 	});
 	const deviceCount = $derived(data.notifications.endpoints.length);
 	const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -224,7 +233,15 @@
 	{@render soon('Cards, cash and payment apps')}
 {/snippet}
 {#snippet widgetBody()}
-	{@render soon('Home Screen widget')}
+	<span class="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+		{#if data.widget.tokens === 0}
+			<span>Home Screen widget</span>
+			<span>Not set up</span>
+		{:else}
+			<span>{plural(data.widget.tokens, 'token')}</span>
+			<span>{widgetLastUsed}</span>
+		{/if}
+	</span>
 {/snippet}
 
 <div class="grid max-w-3xl grid-cols-2 gap-3 lg:grid-cols-4">
@@ -232,6 +249,6 @@
 	{@render card('/settings/recurring', 'Recurring', Repeat, true, recurringBody)}
 	{@render card('/settings/categories', 'Categories', Tags, false, categoriesBody)}
 	{@render card('/settings/notifications', 'Notifications', Bell, false, notificationsBody)}
+	{@render card('/settings/widget', 'Widget', LayoutGrid, false, widgetBody)}
 	{@render card(null, 'Payment methods', CreditCard, false, paymentBody)}
-	{@render card(null, 'Widget', LayoutGrid, false, widgetBody)}
 </div>

@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { listTokens } from '#lib/server/api-token.ts';
 import { today } from '#lib/dates.ts';
 import { chargesPerMonth, upcoming } from '#lib/recurring-schedule.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
@@ -19,14 +20,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// Same as the other pages that show spending: add any recurring charge that's due first.
 	await generateDueCharges(userId, todayForUser);
-	const [budgets, spent, recurring, expenseCategories, incomeCategories, devices] =
+	const [budgets, spent, recurring, expenseCategories, incomeCategories, devices, tokens] =
 		await Promise.all([
 			listBudgets(userId, todayForUser.toPlainYearMonth()),
 			spendingByCategory(userId, start, end),
 			listRecurring(userId),
 			listActiveCategories(userId, 'expense'),
 			listActiveCategories(userId, 'income'),
-			listDevices(userId)
+			listDevices(userId),
+			listTokens(userId)
 		]);
 
 	// Budgets: total of the limits set, and spending in just those categories (so the bar compares
@@ -62,6 +64,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 		recurring: { active, inactive: recurring.length - active, monthlyCents, next },
 		categories: { expense: expenseCategories.length, income: incomeCategories.length },
 		// Endpoints let the page tell whether this browser is one of them ("On for this device").
-		notifications: { configured: pushConfigured, endpoints: devices.map((d) => d.endpoint) }
+		notifications: { configured: pushConfigured, endpoints: devices.map((d) => d.endpoint) },
+		widget: {
+			tokens: tokens.length,
+			lastUsedAt: tokens.reduce<Date | null>(
+				(latest, t) => (t.lastUsedAt && (!latest || t.lastUsedAt > latest) ? t.lastUsedAt : latest),
+				null
+			)
+		}
 	};
 };

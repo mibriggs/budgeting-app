@@ -306,3 +306,33 @@ export const pushSubscription = sqliteTable(
 		check('push_subscription_endpoint_https', sql`${t.endpoint} LIKE 'https://%'`)
 	]
 );
+
+/**
+ * Personal access tokens for the Home Screen widget (Scriptable). Read-only by design: they only
+ * open GET /api/widget. Only a SHA-256 hash of each token is stored; the token itself is shown
+ * once, when it's made. Deleting a row revokes the token.
+ */
+export const apiToken = sqliteTable(
+	'api_token',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		/** What the user called it, e.g. "iPhone widget". */
+		name: text('name').notNull(),
+		/** Hex SHA-256 of the full token; looked up on every widget request. */
+		tokenHash: text('token_hash').notNull().unique(),
+		/** The token's last 4 characters, so the user can tell tokens apart ("…a1B2"). */
+		hint: text('hint').notNull(),
+		/** Updated at most about once an hour, so a busy widget doesn't write on every refresh. */
+		lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
+		...timestamps
+	},
+	(t) => [
+		index('api_token_user_idx').on(t.userId),
+		check('api_token_name_not_blank', notBlank(t.name)),
+		check('api_token_name_length', sql`length(${t.name}) <= 40`),
+		check('api_token_hash_format', sql`length(${t.tokenHash}) = 64`)
+	]
+);
