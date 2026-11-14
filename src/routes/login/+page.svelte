@@ -4,15 +4,16 @@
 	of three soft colour blobs, decorative only and still for Reduce Motion; the content sits on
 	a frosted panel so it stays readable. Design picked in the /dev/sign-in mock.
 
-	Google sign-in isn't wired up yet: its button does nothing for now (future-plans, "Google
-	sign-in").
+	The Google button shows only when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set.
 -->
 <script lang="ts">
 	import GithubLogo from '#lib/components/GithubLogo.svelte';
 	import GoogleLogo from '#lib/components/GoogleLogo.svelte';
 	import type { PageProps } from './$types';
 
-	let { form }: PageProps = $props();
+	let { data, form }: PageProps = $props();
+
+	const message = $derived(form?.message ?? data.callbackError);
 
 	const button =
 		'flex h-11 w-full items-center justify-center gap-3 rounded-md px-4 text-sm font-medium transition';
@@ -41,7 +42,7 @@
 		</div>
 
 		<div class="flex w-full flex-col gap-3">
-			<!-- No use:enhance: the action redirects to github.com, which needs a full page navigation. -->
+			<!-- No use:enhance: the actions redirect to GitHub or Google, which needs a full page navigation. -->
 			<form method="post" action="?/signInWithGitHub">
 				<button
 					class="{button} bg-gray-900 text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
@@ -51,18 +52,20 @@
 				</button>
 			</form>
 
-			<!-- Not wired up yet: does nothing until Google sign-in is added. -->
-			<button
-				type="button"
-				class="{button} border border-[#747775] bg-white text-[#1f1f1f] hover:bg-gray-50 dark:border-[#8e918f] dark:bg-[#131314] dark:text-[#e3e3e3] dark:hover:bg-[#1f1f20]"
-			>
-				<GoogleLogo class="size-5" />
-				Sign in with Google
-			</button>
+			{#if data.google}
+				<form method="post" action="?/signInWithGoogle">
+					<button
+						class="{button} border border-[#747775] bg-white text-[#1f1f1f] hover:bg-gray-50 dark:border-[#8e918f] dark:bg-[#131314] dark:text-[#e3e3e3] dark:hover:bg-[#1f1f20]"
+					>
+						<GoogleLogo class="size-5" />
+						Sign in with Google
+					</button>
+				</form>
+			{/if}
 		</div>
 
-		{#if form?.message}
-			<p class="text-sm text-red-600" role="alert">{form.message}</p>
+		{#if message}
+			<p class="text-center text-sm text-red-600" role="alert">{message}</p>
 		{/if}
 	</div>
 </main>

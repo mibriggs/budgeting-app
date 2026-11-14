@@ -38,6 +38,17 @@ export const variables = defineEnvVars({
 		description:
 			'GitHub OAuth client secret. See [Better Auth GitHub provider](https://www.better-auth.com/docs/authentication/github).'
 	},
+	// Google sign-in. Both optional: while either is missing, the login page shows GitHub only.
+	GOOGLE_CLIENT_ID: {
+		description:
+			'Google OAuth client ID ("Web application" client in Google Cloud). See [Better Auth Google provider](https://www.better-auth.com/docs/authentication/google).',
+		schema: (value) => value?.trim() || undefined
+	},
+	GOOGLE_CLIENT_SECRET: {
+		description:
+			'Google OAuth client secret. See [Better Auth Google provider](https://www.better-auth.com/docs/authentication/google).',
+		schema: (value) => value?.trim() || undefined
+	},
 	// Web Push (Settings → Notifications). Generate once with `npx web-push generate-vapid-keys`.
 	// All three are optional: while any is missing, notifications are off and the page says so.
 	VAPID_PUBLIC_KEY: {
