@@ -62,7 +62,7 @@
 			align="end"
 			sideOffset={8}
 			collisionPadding={8}
-			class="z-50 min-w-44 rounded-lg border border-gray-200 bg-white p-1 text-gray-900 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+			class="z-50 min-w-44 rounded-lg border border-gray-200 bg-white p-1 text-gray-900 shadow-lg outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 		>
 			<DropdownMenu.Item class={item}>
 				{#snippet child({ props })}

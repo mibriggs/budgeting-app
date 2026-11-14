@@ -86,7 +86,7 @@
 			sideOffset={6}
 			align="start"
 			collisionPadding={8}
-			class="z-60 rounded-lg border border-gray-200 bg-white p-3 text-gray-900 shadow-lg dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+			class="z-60 rounded-lg border border-gray-200 bg-white p-3 text-gray-900 shadow-lg outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 		>
 			<Calendar.Root
 				type="single"
