@@ -23,52 +23,59 @@
 	<title>Sign in · Budget</title>
 </svelte:head>
 
-<div class="pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
-	<div class="blob blob-a"></div>
-	<div class="blob blob-b"></div>
-	<div class="blob blob-c"></div>
-</div>
+<!--
+	The glow layer is `absolute` inside this wrapper, not `fixed`: Safari on iOS tints the status bar
+	with the background colour of a fixed element touching the top of the screen, which turned it
+	solid green from the first blob.
+-->
+<div class="relative min-h-dvh overflow-hidden">
+	<div class="pointer-events-none absolute inset-0" aria-hidden="true">
+		<div class="blob blob-a"></div>
+		<div class="blob blob-b"></div>
+		<div class="blob blob-c"></div>
+	</div>
 
-<main class="relative mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center p-6">
-	<div
-		class="flex w-full flex-col items-center gap-6 rounded-3xl border border-white/60 bg-white/70 p-6 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-gray-950/70"
-	>
-		<div class="flex flex-col items-center gap-2 text-center">
-			<img src="/icons/icon-192.png" alt="" class="size-14 rounded-2xl shadow-sm" />
-			<h1 class="text-3xl font-semibold">Sign in</h1>
-			<p class="text-sm text-gray-500 dark:text-gray-400">
-				Track spending, budgets and recurring bills.
-			</p>
-		</div>
+	<main class="relative mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center p-6">
+		<div
+			class="flex w-full flex-col items-center gap-6 rounded-3xl border border-white/60 bg-white/70 p-6 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-gray-950/70"
+		>
+			<div class="flex flex-col items-center gap-2 text-center">
+				<img src="/icons/icon-192.png" alt="" class="size-14 rounded-2xl shadow-sm" />
+				<h1 class="text-3xl font-semibold">Sign in</h1>
+				<p class="text-sm text-gray-500 dark:text-gray-400">
+					Track spending, budgets and recurring bills.
+				</p>
+			</div>
 
-		<div class="flex w-full flex-col gap-3">
-			<!-- No use:enhance: the actions redirect to GitHub or Google, which needs a full page navigation. -->
-			<form method="post" action="?/signInWithGitHub">
-				<button
-					class="{button} bg-gray-900 text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-				>
-					<GithubLogo />
-					Sign in with GitHub
-				</button>
-			</form>
-
-			{#if data.google}
-				<form method="post" action="?/signInWithGoogle">
+			<div class="flex w-full flex-col gap-3">
+				<!-- No use:enhance: the actions redirect to GitHub or Google, which needs a full page navigation. -->
+				<form method="post" action="?/signInWithGitHub">
 					<button
-						class="{button} border border-[#747775] bg-white text-[#1f1f1f] hover:bg-gray-50 dark:border-[#8e918f] dark:bg-[#131314] dark:text-[#e3e3e3] dark:hover:bg-[#1f1f20]"
+						class="{button} bg-gray-900 text-white hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
 					>
-						<GoogleLogo class="size-5" />
-						Sign in with Google
+						<GithubLogo />
+						Sign in with GitHub
 					</button>
 				</form>
+
+				{#if data.google}
+					<form method="post" action="?/signInWithGoogle">
+						<button
+							class="{button} border border-[#747775] bg-white text-[#1f1f1f] hover:bg-gray-50 dark:border-[#8e918f] dark:bg-[#131314] dark:text-[#e3e3e3] dark:hover:bg-[#1f1f20]"
+						>
+							<GoogleLogo class="size-5" />
+							Sign in with Google
+						</button>
+					</form>
+				{/if}
+			</div>
+
+			{#if message}
+				<p class="text-center text-sm text-red-600" role="alert">{message}</p>
 			{/if}
 		</div>
-
-		{#if message}
-			<p class="text-center text-sm text-red-600" role="alert">{message}</p>
-		{/if}
-	</div>
-</main>
+	</main>
+</div>
 
 <style>
 	.blob {
