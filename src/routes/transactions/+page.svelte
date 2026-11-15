@@ -223,11 +223,18 @@
 					{selected}
 					{selecting}
 					onDelete={(ids) => confirmDelete(kind, ids)}
+					paidWith={kind === 'expense'}
 					active={wide.current !== true}
 				/>
 			</div>
 			<div class="hidden min-h-0 flex-1 sm:block">
-				<TransactionGrid {rows} {label} {selected} active={wide.current !== false} />
+				<TransactionGrid
+					{rows}
+					{label}
+					{selected}
+					paidWith={kind === 'expense'}
+					active={wide.current !== false}
+				/>
 			</div>
 		</div>
 	{/if}
@@ -290,6 +297,8 @@
 	bind:open={addOpen}
 	bind:kind={addKind}
 	categories={data.categories}
+	paymentMethods={data.paymentMethods}
+	lastPaidWith={data.lastPaidWith}
 	today={data.today}
 	{onCreated}
 />

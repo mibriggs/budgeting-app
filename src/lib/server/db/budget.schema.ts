@@ -141,6 +141,12 @@ export const expense = sqliteTable(
 			onDelete: 'set null'
 		}),
 		occurrenceDate: plainDate('occurrence_date'),
+		// What it was paid with (Settings → Payment methods); NULL = not recorded. Single-column
+		// FK, ownership checked in code, for the same reason as the recurring link. Removing a
+		// method archives it (see payment-methods.ts), so this normally stays set.
+		paymentMethodId: text('payment_method_id').references(() => paymentMethod.id, {
+			onDelete: 'set null'
+		}),
 		...timestamps
 	},
 	(t) => [
@@ -153,6 +159,7 @@ export const expense = sqliteTable(
 		}).onDelete('no action'),
 		index('expense_user_date_idx').on(t.userId, t.purchaseDate),
 		index('expense_category_date_idx').on(t.categoryId, t.purchaseDate),
+		index('expense_payment_method_date_idx').on(t.paymentMethodId, t.purchaseDate),
 		check('expense_name_not_blank', notBlank(t.name)),
 		check('expense_amount_positive', sql`${t.amountCents} > 0`),
 		check('expense_purchase_date_valid', isCalendarDate(t.purchaseDate)),
@@ -334,5 +341,66 @@ export const apiToken = sqliteTable(
 		check('api_token_name_not_blank', notBlank(t.name)),
 		check('api_token_name_length', sql`length(${t.name}) <= 40`),
 		check('api_token_hash_format', sql`length(${t.tokenHash}) = 64`)
+	]
+);
+
+// ---------------------------------------------------------------------------
+// Payment methods
+//
+// What an expense was paid with: credit and debit cards, pay apps (Venmo, Zelle…) and one
+// built-in Cash per user (made on first use, can't be removed). Never full card numbers,
+// expiry dates or logins: only the last 4 digits, to tell cards apart.
+
+export const PAYMENT_METHOD_KINDS = ['credit', 'debit', 'p2p', 'cash'] as const;
+export type PaymentMethodKind = (typeof PAYMENT_METHOD_KINDS)[number];
+
+export const paymentMethod = sqliteTable(
+	'payment_method',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		kind: text('kind', { enum: PAYMENT_METHOD_KINDS }).notNull(),
+		/** "Chase Sapphire", "Venmo". */
+		name: text('name').notNull(),
+		/** Cards only, optional: exactly 4 digits. */
+		last4: text('last4'),
+		// Credit cards only, each optional.
+		limitCents: integer('limit_cents'),
+		/** Day of the month the statement closes (1–31; short months use their last day). */
+		closingDay: integer('closing_day'),
+		/** Day of the month the payment is due (1–31; short months use their last day). */
+		dueDay: integer('due_day'),
+		/** Minutes after midnight for due-date reminders (not sent yet; see future plans). */
+		remindAtMinutes: integer('remind_at_minutes').notNull().default(720),
+		/** Removed by the user but still on past expenses. Hidden everywhere else. */
+		archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),
+		...timestamps
+	},
+	(t) => [
+		index('payment_method_user_idx').on(t.userId),
+		// One Cash per user, so making it on first use can't add a second.
+		uniqueIndex('payment_method_one_cash')
+			.on(t.userId)
+			.where(sql`kind = 'cash'`),
+		check('payment_method_kind_valid', sql`${t.kind} IN ('credit', 'debit', 'p2p', 'cash')`),
+		check('payment_method_name_not_blank', notBlank(t.name)),
+		check('payment_method_name_length', sql`length(${t.name}) <= 40`),
+		check(
+			'payment_method_last4_valid',
+			sql`${t.last4} IS NULL OR (${t.kind} IN ('credit', 'debit') AND ${t.last4} GLOB '[0-9][0-9][0-9][0-9]')`
+		),
+		check(
+			'payment_method_credit_only',
+			sql`${t.kind} = 'credit' OR (${t.limitCents} IS NULL AND ${t.closingDay} IS NULL AND ${t.dueDay} IS NULL)`
+		),
+		check('payment_method_limit_positive', sql`${t.limitCents} IS NULL OR ${t.limitCents} > 0`),
+		check(
+			'payment_method_closing_day_valid',
+			sql`${t.closingDay} IS NULL OR ${t.closingDay} BETWEEN 1 AND 31`
+		),
+		check('payment_method_due_day_valid', sql`${t.dueDay} IS NULL OR ${t.dueDay} BETWEEN 1 AND 31`),
+		check('payment_method_remind_at_valid', sql`${t.remindAtMinutes} BETWEEN 0 AND 1439`)
 	]
 );

@@ -7,6 +7,10 @@ import type { RequestHandler } from './$types';
 /** Saves the browser's IANA time zone so the server knows the user's "today". */
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) error(401, 'Not signed in');
+	// JSON only: another site can't send that without the browser asking this one first, so a
+	// cross-site form can't change it (on top of the SameSite=Lax session cookie).
+	if (!request.headers.get('content-type')?.startsWith('application/json'))
+		error(415, 'Expected JSON');
 
 	const body: unknown = await request.json().catch(() => null);
 	const timezone =

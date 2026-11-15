@@ -1,7 +1,6 @@
 <!--
 	Settings overview: a card per section with a short summary, full width for the two with the
-	most to say (Budgets, Recurring) and half width for the rest. Sections that aren't built yet
-	show as "Coming soon" and don't link anywhere. Only below `large` (11-inch iPad in
+	most to say (Budgets, Recurring) and half width for the rest. Only below `large` (11-inch iPad in
 	landscape); larger screens use the sidebar instead (see +layout.svelte).
 -->
 <script lang="ts">
@@ -23,6 +22,7 @@
 		| '/settings/budgets'
 		| '/settings/recurring'
 		| '/settings/categories'
+		| '/settings/payment-methods'
 		| '/settings/notifications'
 		| '/settings/widget';
 
@@ -219,18 +219,18 @@
 	</span>
 {/snippet}
 
-{#snippet soon(text: string)}
-	<span class="flex flex-col items-start gap-1.5 text-xs">
-		<span>{text}</span>
-		<span
-			class="rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-		>
-			Coming soon
-		</span>
-	</span>
-{/snippet}
 {#snippet paymentBody()}
-	{@render soon('Cards, cash and payment apps')}
+	<span class="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+		{#if data.payments.count === 0}
+			<span>Cards and pay apps</span>
+			<span>Only cash so far</span>
+		{:else}
+			<span>{plural(data.payments.count, 'card or app', 'cards and apps')}</span>
+			{#if data.payments.nextDue}
+				<span>{data.payments.nextDue.name} due {whenLabel(data.payments.nextDue.date)}</span>
+			{/if}
+		{/if}
+	</span>
 {/snippet}
 {#snippet widgetBody()}
 	<span class="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
@@ -248,7 +248,7 @@
 	{@render card('/settings/budgets', 'Budgets', Wallet, true, budgetsBody)}
 	{@render card('/settings/recurring', 'Recurring', Repeat, true, recurringBody)}
 	{@render card('/settings/categories', 'Categories', Tags, false, categoriesBody)}
+	{@render card('/settings/payment-methods', 'Payment methods', CreditCard, false, paymentBody)}
 	{@render card('/settings/notifications', 'Notifications', Bell, false, notificationsBody)}
 	{@render card('/settings/widget', 'Widget', LayoutGrid, false, widgetBody)}
-	{@render card(null, 'Payment methods', CreditCard, false, paymentBody)}
 </div>

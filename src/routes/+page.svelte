@@ -7,12 +7,17 @@
 	import AppHeader from '#lib/components/AppHeader.svelte';
 	import BudgetCard from '#lib/components/dashboard/BudgetCard.svelte';
 	import CategorySpending from '#lib/components/dashboard/CategorySpending.svelte';
+	import CreditCardsCard from '#lib/components/dashboard/CreditCardsCard.svelte';
 	import MonthlyChart from '#lib/components/dashboard/MonthlyChart.svelte';
 	import PaceChart from '#lib/components/dashboard/PaceChart.svelte';
 	import StatTiles from '#lib/components/dashboard/StatTiles.svelte';
 	import type { PlainDate, Temporal } from '#lib/dates.ts';
 	import { formatDate, formatMonth, monthRangeParams } from '#lib/date-range.ts';
 	import { updateQuery } from '#lib/url.ts';
+	import { saveCreditCardsCard } from '#lib/home-cards.ts';
+	import { cubicOut } from 'svelte/easing';
+	import { prefersReducedMotion } from 'svelte/motion';
+	import { blur, slide } from 'svelte/transition';
 	import type { TransactionKind } from '#lib/server/budget/transactions.ts';
 	import type { PageProps } from './$types';
 
@@ -20,6 +25,30 @@
 
 	const monthName = (month: Temporal.PlainYearMonth) => formatMonth(month, { year: false });
 	let thisMonthLabel = $derived(formatMonth(data.dashboard.month));
+
+	// "Credit cards" card. Hidden right away when the × is pressed (then saved); Undo shows it
+	// again. It blurs out, then the space slides shut so the cards below move up smoothly.
+	// svelte-ignore state_referenced_locally
+	let showCreditCards = $state(data.showCreditCards);
+	const still = $derived(prefersReducedMotion.current);
+	const cardBlur = (node: Element) =>
+		still ? { duration: 0 } : blur(node, { duration: 300, amount: 8, easing: cubicOut });
+	const closeGap = (node: Element) =>
+		still ? { duration: 0 } : slide(node, { duration: 250, delay: 250, easing: cubicOut });
+
+	async function setCreditCards(show: boolean) {
+		showCreditCards = show;
+		if (!(await saveCreditCardsCard(show))) showCreditCards = !show;
+	}
+
+	async function hideCreditCards() {
+		await setCreditCards(false);
+		if (showCreditCards) return; // Couldn't save; it's back.
+		toast('Credit cards hidden from home.', {
+			description: 'Turn it back on in Settings → Payment methods.',
+			action: { label: 'Undo', onClick: () => setCreditCards(true) }
+		});
+	}
 
 	let addKind = $state<TransactionKind>('expense');
 	let addOpen = $state(false);
@@ -90,6 +119,17 @@
 			subtitle={thisMonthLabel}
 		/>
 		<BudgetCard summary={data.dashboard.budgets} subtitle={thisMonthLabel} />
+		{#if showCreditCards}
+			<div class="lg:col-span-2" transition:closeGap>
+				<div transition:cardBlur>
+					<CreditCardsCard
+						cards={data.dashboard.cards}
+						today={data.today}
+						onHide={hideCreditCards}
+					/>
+				</div>
+			</div>
+		{/if}
 		<div class="lg:col-span-2">
 			<PaceChart
 				points={data.dashboard.pace}
@@ -105,6 +145,8 @@
 	bind:open={addOpen}
 	bind:kind={addKind}
 	categories={data.categories}
+	paymentMethods={data.paymentMethods}
+	lastPaidWith={data.lastPaidWith}
 	today={data.today}
 	action="/transactions?/create"
 	{onCreated}

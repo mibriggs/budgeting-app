@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `show_credit_cards` integer DEFAULT true NOT NULL;

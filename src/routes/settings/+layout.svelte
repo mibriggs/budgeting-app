@@ -35,6 +35,12 @@
 			icon: Tags
 		},
 		{
+			id: '/settings/payment-methods',
+			href: resolve('/settings/payment-methods'),
+			label: 'Payment methods',
+			icon: CreditCard
+		},
+		{
 			id: '/settings/notifications',
 			href: resolve('/settings/notifications'),
 			label: 'Notifications',
@@ -47,8 +53,6 @@
 			icon: LayoutGrid
 		}
 	];
-	// Not built yet: listed, muted, not links (same as the "Coming soon" cards).
-	const comingSoon = [{ label: 'Payment methods', icon: CreditCard }];
 	// Compared by route id: during server rendering resolve() gives relative paths ("./settings"),
 	// which never equal the URL's pathname.
 	const onOverview = $derived(page.route.id === '/settings');
@@ -97,19 +101,6 @@
 								<s.icon class="size-4" aria-hidden="true" />
 								{s.label}
 							</a>
-						</li>
-					{/each}
-					{#each comingSoon as s (s.label)}
-						<li
-							class="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-400 dark:text-gray-500"
-						>
-							<s.icon class="size-4" aria-hidden="true" />
-							<span class="flex-1">{s.label}</span>
-							<span
-								class="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400"
-							>
-								Soon
-							</span>
 						</li>
 					{/each}
 				</ul>

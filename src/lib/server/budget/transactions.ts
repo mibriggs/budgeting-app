@@ -1,7 +1,14 @@
-import { and, between, desc, eq, inArray } from 'drizzle-orm';
+import { and, between, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { PlainDate } from '#lib/dates.ts';
 import { db } from '#lib/server/db/index.ts';
-import { expense, expenseCategory, income, incomeCategory } from '#lib/server/db/schema.ts';
+import type { PaymentMethodKind } from '#lib/payment-methods.ts';
+import {
+	expense,
+	expenseCategory,
+	income,
+	incomeCategory,
+	paymentMethod
+} from '#lib/server/db/schema.ts';
 
 type Range = { from: PlainDate; to: PlainDate };
 
@@ -18,10 +25,15 @@ export function listExpenses(userId: string, { from, to }: Range) {
 			categoryName: expenseCategory.name,
 			categoryColor: expenseCategory.color,
 			categoryIcon: expenseCategory.icon,
+			// What it was paid with; all NULL when not recorded. Removed methods still show.
+			paymentMethodKind: paymentMethod.kind,
+			paymentMethodName: paymentMethod.name,
+			paymentMethodLast4: paymentMethod.last4,
 			createdAt: expense.createdAt
 		})
 		.from(expense)
 		.innerJoin(expenseCategory, eq(expense.categoryId, expenseCategory.id))
+		.leftJoin(paymentMethod, eq(expense.paymentMethodId, paymentMethod.id))
 		.where(and(eq(expense.userId, userId), between(expense.purchaseDate, from, to)))
 		.orderBy(desc(expense.purchaseDate), desc(expense.createdAt));
 }
@@ -39,6 +51,10 @@ export function listIncome(userId: string, { from, to }: Range) {
 			categoryName: incomeCategory.name,
 			categoryColor: incomeCategory.color,
 			categoryIcon: incomeCategory.icon,
+			// Income has no payment method; same shape as expense rows.
+			paymentMethodKind: sql<PaymentMethodKind | null>`NULL`,
+			paymentMethodName: sql<string | null>`NULL`,
+			paymentMethodLast4: sql<string | null>`NULL`,
 			createdAt: income.createdAt
 		})
 		.from(income)
@@ -74,6 +90,8 @@ export type NewTransaction = {
 	amountCents: number;
 	categoryId: string;
 	notes: string | null;
+	/** Expenses only: what it was paid with (already checked to be the user's), or null. */
+	paymentMethodId?: string | null;
 };
 
 /** Adds an expense or income row for the user. Inputs must already be validated. Returns its ID. */
@@ -93,7 +111,11 @@ export async function createTransaction(
 		kind === 'expense'
 			? await db
 					.insert(expense)
-					.values({ ...base, purchaseDate: input.date })
+					.values({
+						...base,
+						purchaseDate: input.date,
+						paymentMethodId: input.paymentMethodId ?? null
+					})
 					.returning({ id: expense.id })
 			: await db
 					.insert(income)

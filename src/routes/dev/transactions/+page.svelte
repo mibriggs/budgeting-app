@@ -101,11 +101,18 @@
 			{selected}
 			{selecting}
 			onDelete={confirmDelete}
+			paidWith
 			active={wide.current !== true}
 		/>
 	</div>
 	<div class="hidden min-h-0 flex-1 sm:block">
-		<TransactionGrid rows={data.rows} label="Preview" {selected} active={wide.current !== false} />
+		<TransactionGrid
+			rows={data.rows}
+			label="Preview"
+			{selected}
+			paidWith
+			active={wide.current !== false}
+		/>
 	</div>
 </main>
 

@@ -1,7 +1,8 @@
 <!--
 	@component
 	Drizzle Studio–style data grid for wider screens: dense rows, cell borders, a sticky
-	header showing each column's name and type, row numbers, and sortable columns.
+	header showing each column's name and type, row numbers, and sortable columns. Expenses also
+	get a "Paid with" column (NULL when not recorded).
 	Checkboxes select rows (Shift-click selects a range); the header box selects the whole tab.
 	Only the rows in view are rendered (virtualized), so thousands of rows scroll smoothly.
 	As tall as its rows, up to its parent's height; past that it scrolls inside itself.
@@ -11,6 +12,8 @@
 	import ArrowUp from '@lucide/svelte/icons/arrow-up';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import { categoryIcon } from '#lib/category-icons.ts';
+	import PaymentMethodIcon from '#lib/components/PaymentMethodIcon.svelte';
+	import { last4Label } from '#lib/payment-methods.ts';
 	import { formatDate } from '#lib/date-range.ts';
 	import { formatCents } from '#lib/money.ts';
 	import type { TransactionRow } from '#lib/server/budget/transactions.ts';
@@ -22,27 +25,34 @@
 		rows,
 		label,
 		selected,
+		paidWith = false,
 		active = true
 	}: {
 		rows: TransactionRow[];
 		label: string;
 		/** IDs of ticked rows. Shared with the page, which owns deleting them. */
 		selected: SvelteSet<string>;
+		/** Add the "Paid with" column (the expenses tab; income has none). */
+		paidWith?: boolean;
 		/** False while hidden by CSS, so it doesn't render rows nobody can see. */
 		active?: boolean;
 	} = $props();
 
 	const ROW_HEIGHT = 32;
 
-	const columns: { key: SortKey; name: string; type: string; align?: 'right' }[] = [
-		{ key: 'date', name: 'Date', type: 'date' },
-		{ key: 'name', name: 'Name', type: 'text' },
-		{ key: 'categoryName', name: 'Category', type: 'text' },
-		{ key: 'amountCents', name: 'Amount', type: 'money', align: 'right' },
-		{ key: 'notes', name: 'Notes', type: 'text' }
-	];
+	type Column = { key: SortKey; name: string; type: string; width: string; align?: 'right' };
+	const columns = $derived<Column[]>([
+		{ key: 'date', name: 'Date', type: 'date', width: '8.5rem' },
+		{ key: 'name', name: 'Name', type: 'text', width: 'minmax(14rem,1.5fr)' },
+		{ key: 'categoryName', name: 'Category', type: 'text', width: '14rem' },
+		...(paidWith
+			? [{ key: 'paymentMethodName', name: 'Paid with', type: 'text', width: '14rem' } as const]
+			: []),
+		{ key: 'amountCents', name: 'Amount', type: 'money', width: '7.5rem', align: 'right' },
+		{ key: 'notes', name: 'Notes', type: 'text', width: 'minmax(15rem,2fr)' }
+	]);
 	// Checkbox, row number, then the columns above. Shared by the header and every row.
-	const template = '2.25rem 3.5rem 8.5rem minmax(14rem,1.5fr) 14rem 7.5rem minmax(15rem,2fr)';
+	const template = $derived(['2.25rem', '3.5rem', ...columns.map((c) => c.width)].join(' '));
 
 	let sort = $state<Sort>(null);
 	let sorted = $derived(sortRows(rows, sort));
@@ -107,7 +117,8 @@
 	aria-label={label}
 	aria-rowcount={sorted.length + 1}
 >
-	<div class="min-w-[64rem]">
+	<!-- Wide enough for every column's minimum, so row backgrounds span the full width. -->
+	<div class={paidWith ? 'min-w-[79rem]' : 'min-w-[64rem]'}>
 		<!-- Header: sticks to the top while the body scrolls under it. -->
 		<div
 			role="row"
@@ -221,6 +232,24 @@
 						<Icon class="size-4 shrink-0 text-gray-500" aria-hidden="true" />
 						<span class="truncate">{row.categoryName}</span>
 					</div>
+					{#if paidWith}
+						<div role="cell" class="{cell} gap-2">
+							{#if row.paymentMethodKind && row.paymentMethodName}
+								<PaymentMethodIcon
+									kind={row.paymentMethodKind}
+									class="size-4 shrink-0 text-gray-500"
+								/>
+								<span class="truncate">{row.paymentMethodName}</span>
+								{#if row.paymentMethodLast4}
+									<span class="shrink-0 text-xs text-gray-500 tabular-nums">
+										{last4Label(row.paymentMethodLast4)}
+									</span>
+								{/if}
+							{:else}
+								<span class="font-mono text-xs text-gray-300 italic dark:text-gray-600">NULL</span>
+							{/if}
+						</div>
+					{/if}
 					<div role="cell" class="{cell} justify-end tabular-nums">
 						{formatCents(row.amountCents)}
 					</div>

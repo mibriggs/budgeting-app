@@ -2,6 +2,11 @@ import { redirect } from '@sveltejs/kit';
 import { summarizeBudgets } from '#lib/budget-status.ts';
 import { today } from '#lib/dates.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
+import {
+	creditCardSummaries,
+	lastUsedPaymentMethodId,
+	listPaymentMethods
+} from '#lib/server/budget/payment-methods.ts';
 import { generateDueCharges } from '#lib/server/budget/recurring.ts';
 import {
 	dailySpending,
@@ -34,19 +39,31 @@ export const load: PageServerLoad = async ({ locals }) => {
 	// Add any recurring charges that came due (e.g. rent on the 1st) before reading expenses.
 	await generateDueCharges(userId, todayForUser);
 
-	const [expenseCategories, incomeCategories, months, byCategory, thisDaily, lastDaily, limits] =
-		await Promise.all([
-			// For the add expense / add income dialogs.
-			listActiveCategories(userId, 'expense'),
-			listActiveCategories(userId, 'income'),
-			// For the charts.
-			monthlyTotals(userId, trendStart, thisEnd),
-			spendingByCategory(userId, thisStart, thisEnd),
-			dailySpending(userId, thisStart, todayForUser),
-			dailySpending(userId, lastStart, lastEnd),
-			listBudgets(userId, thisStart.toPlainYearMonth())
-		]);
+	const [
+		expenseCategories,
+		incomeCategories,
+		paymentMethods,
+		lastPaidWith,
+		months,
+		byCategory,
+		thisDaily,
+		lastDaily,
+		limits
+	] = await Promise.all([
+		// For the add expense / add income dialogs.
+		listActiveCategories(userId, 'expense'),
+		listActiveCategories(userId, 'income'),
+		listPaymentMethods(userId),
+		lastUsedPaymentMethodId(userId),
+		// For the charts.
+		monthlyTotals(userId, trendStart, thisEnd),
+		spendingByCategory(userId, thisStart, thisEnd),
+		dailySpending(userId, thisStart, todayForUser),
+		dailySpending(userId, lastStart, lastEnd),
+		listBudgets(userId, thisStart.toPlainYearMonth())
+	]);
 
+	const cards = await creditCardSummaries(userId, todayForUser, paymentMethods);
 	const trend = fillMonths(trendStart.toPlainYearMonth(), thisStart.toPlainYearMonth(), months);
 	const thisMonth = trend.at(-1)!;
 	const pace = paceByDay(todayForUser, thisDaily, lastDaily);
@@ -58,6 +75,16 @@ export const load: PageServerLoad = async ({ locals }) => {
 		displayName: displayName(locals.user),
 		today: todayForUser,
 		categories: { expense: expenseCategories, income: incomeCategories },
+		paymentMethods: paymentMethods.map(({ id, kind, name, last4, closingDay }) => ({
+			id,
+			kind,
+			name,
+			last4,
+			closingDay
+		})),
+		lastPaidWith,
+		// Home page "Credit cards" card: on unless hidden (saved per account).
+		showCreditCards: locals.user.showCreditCards ?? true,
 		dashboard: {
 			month: thisStart.toPlainYearMonth(),
 			tiles: {
@@ -71,6 +98,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			slices: topCategories(byCategory),
 			trend,
 			pace,
+			cards,
 			budgets: summarizeBudgets(
 				limits,
 				new Map(byCategory.map((row) => [row.id, row.cents])),

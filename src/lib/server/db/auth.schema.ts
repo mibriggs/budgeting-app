@@ -15,7 +15,8 @@ export const user = sqliteTable('user', {
 		.$onUpdate(() => /* @__PURE__ */ new Date())
 		.notNull(),
 	username: text('username'),
-	timezone: text('timezone')
+	timezone: text('timezone'),
+	showCreditCards: integer('show_credit_cards', { mode: 'boolean' }).default(true).notNull()
 });
 
 export const session = sqliteTable(

@@ -2,7 +2,9 @@ import { redirect } from '@sveltejs/kit';
 import { listTokens } from '#lib/server/api-token.ts';
 import { today } from '#lib/dates.ts';
 import { chargesPerMonth, upcoming } from '#lib/recurring-schedule.ts';
+import { nextOnDay } from '#lib/payment-methods.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
+import { listPaymentMethods } from '#lib/server/budget/payment-methods.ts';
 import { spendingByCategory } from '#lib/server/budget/dashboard.ts';
 import { listBudgets } from '#lib/server/budget/limits.ts';
 import { generateDueCharges, listRecurring } from '#lib/server/budget/recurring.ts';
@@ -20,7 +22,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// Same as the other pages that show spending: add any recurring charge that's due first.
 	await generateDueCharges(userId, todayForUser);
-	const [budgets, spent, recurring, expenseCategories, incomeCategories, devices, tokens] =
+	const [budgets, spent, recurring, expenseCategories, incomeCategories, devices, tokens, methods] =
 		await Promise.all([
 			listBudgets(userId, todayForUser.toPlainYearMonth()),
 			spendingByCategory(userId, start, end),
@@ -28,7 +30,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			listActiveCategories(userId, 'expense'),
 			listActiveCategories(userId, 'income'),
 			listDevices(userId),
-			listTokens(userId)
+			listTokens(userId),
+			listPaymentMethods(userId)
 		]);
 
 	// Budgets: total of the limits set, and spending in just those categories (so the bar compares
@@ -58,8 +61,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 			next = { name: item.name, amountCents: item.amountCents, date };
 	}
 
+	// Payment methods: how many besides the built-in Cash, and the next credit card payment due.
+	let nextDue: { name: string; date: typeof todayForUser } | null = null;
+	for (const m of methods) {
+		if (m.kind !== 'credit' || !m.dueDay) continue;
+		const date = nextOnDay(todayForUser, m.dueDay);
+		if (!nextDue || date.until(nextDue.date).days > 0) nextDue = { name: m.name, date };
+	}
+
 	return {
 		today: todayForUser,
+		payments: { count: methods.filter((m) => m.kind !== 'cash').length, nextDue },
 		budgets: budgetSummary,
 		recurring: { active, inactive: recurring.length - active, monthlyCents, next },
 		categories: { expense: expenseCategories.length, income: incomeCategories.length },

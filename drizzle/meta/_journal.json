@@ -71,6 +71,20 @@
       "when": 1794610698969,
       "tag": "0009_api_token",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794697419942,
+      "tag": "0010_payment_method",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1794771240599,
+      "tag": "0011_home_card_setting",
+      "breakpoints": true
     }
   ]
 }

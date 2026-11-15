@@ -2,6 +2,11 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { today } from '#lib/dates.ts';
 import { resolveRange } from '#lib/date-range.ts';
 import { isActiveCategory, listActiveCategories } from '#lib/server/budget/categories.ts';
+import {
+	isActivePaymentMethod,
+	lastUsedPaymentMethodId,
+	listPaymentMethods
+} from '#lib/server/budget/payment-methods.ts';
 import { generateDueCharges } from '#lib/server/budget/recurring.ts';
 import { displayName } from '#lib/server/user.ts';
 import {
@@ -31,12 +36,15 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Add any recurring charges that came due (e.g. rent on the 1st) before reading expenses.
 	await generateDueCharges(userId, todayForUser);
 
-	const [expenses, incomes, expenseCategories, incomeCategories] = await Promise.all([
-		listExpenses(userId, range),
-		listIncome(userId, range),
-		listActiveCategories(userId, 'expense'),
-		listActiveCategories(userId, 'income')
-	]);
+	const [expenses, incomes, expenseCategories, incomeCategories, paymentMethods, lastPaidWith] =
+		await Promise.all([
+			listExpenses(userId, range),
+			listIncome(userId, range),
+			listActiveCategories(userId, 'expense'),
+			listActiveCategories(userId, 'income'),
+			listPaymentMethods(userId),
+			lastUsedPaymentMethodId(userId)
+		]);
 
 	return {
 		displayName: displayName(locals.user),
@@ -44,14 +52,22 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		today: todayForUser,
 		expenses,
 		incomes,
-		categories: { expense: expenseCategories, income: incomeCategories }
+		categories: { expense: expenseCategories, income: incomeCategories },
+		paymentMethods: paymentMethods.map(({ id, kind, name, last4, closingDay }) => ({
+			id,
+			kind,
+			name,
+			last4,
+			closingDay
+		})),
+		lastPaidWith
 	};
 };
 
 const isKind = (value: unknown): value is TransactionKind =>
 	value === 'expense' || value === 'income';
 
-export type CreateField = 'name' | 'amount' | 'date' | 'categoryId' | 'notes';
+export type CreateField = 'name' | 'amount' | 'date' | 'categoryId' | 'notes' | 'paymentMethodId';
 
 export const actions: Actions = {
 	/** Adds one expense or income row from the add form. Returns per-field errors on bad input. */
@@ -71,7 +87,9 @@ export const actions: Actions = {
 			amount: field('amount').trim(),
 			date: field('date').trim(),
 			categoryId: field('categoryId').trim(),
-			notes: field('notes').trim()
+			notes: field('notes').trim(),
+			// Expenses only; empty means "not recorded".
+			paymentMethodId: kind === 'expense' ? field('paymentMethodId').trim() : ''
 		};
 		const errors: Partial<Record<CreateField, string>> = {};
 
@@ -93,6 +111,12 @@ export const actions: Actions = {
 		if (values.notes.length > MAX_NOTES_LENGTH)
 			errors.notes = `Keep notes under ${MAX_NOTES_LENGTH} characters.`;
 
+		if (
+			values.paymentMethodId &&
+			!(await isActivePaymentMethod(locals.user.id, values.paymentMethodId))
+		)
+			errors.paymentMethodId = 'That payment method was removed. Pick another.';
+
 		if (Object.keys(errors).length > 0 || amountCents === null || !date) {
 			return fail(400, { kind, errors, values });
 		}
@@ -102,7 +126,8 @@ export const actions: Actions = {
 			date,
 			amountCents,
 			categoryId: values.categoryId,
-			notes: values.notes || null
+			notes: values.notes || null,
+			paymentMethodId: values.paymentMethodId || null
 		});
 		return { created: id, kind, name: values.name, date: values.date };
 	},

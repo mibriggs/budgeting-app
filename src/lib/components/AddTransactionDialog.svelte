@@ -1,7 +1,7 @@
 <!--
 	@component
 	Dialog for adding one expense or income entry: type (Expense | Income), name, amount, date,
-	category and notes. The page picks the starting type; the switch at the top changes it.
+	category, what it was paid with (expenses only, optional) and notes. The page picks the starting type; the switch at the top changes it.
 	Submits to the transactions page's `create` action (src/routes/transactions/+page.server.ts),
 	which validates everything and returns per-field errors; the current page's data reloads
 	after a successful add. Used on the transactions page and the home page.
@@ -15,6 +15,9 @@
 	import { page } from '$app/state';
 	import { categoryIcon } from '#lib/category-icons.ts';
 	import DatePicker from '#lib/components/DatePicker.svelte';
+	import PaymentMethodIcon from '#lib/components/PaymentMethodIcon.svelte';
+	import { formatDate } from '#lib/date-range.ts';
+	import { last4Label, nextOnDay, type PaymentMethodOption } from '#lib/payment-methods.ts';
 	import { Temporal, type PlainDate } from '#lib/dates.ts';
 	import type { CategoryOption } from '#lib/server/budget/categories.ts';
 	import type { TransactionKind } from '#lib/server/budget/transactions.ts';
@@ -26,6 +29,8 @@
 		categories: allCategories,
 		today,
 		action: actionOverride,
+		paymentMethods = [],
+		lastPaidWith = null,
 		onCreated
 	}: {
 		open?: boolean;
@@ -38,17 +43,22 @@
 		action?: string;
 		/** Categories to choose from for each type (archived ones already left out). */
 		categories: Record<TransactionKind, CategoryOption[]>;
+		/** Choices for "Paid with" on expenses (removed ones already left out). */
+		paymentMethods?: PaymentMethodOption[];
+		/** The method on the most recent expense; "Paid with" starts on it. */
+		lastPaidWith?: string | null;
 		/** Default date: today in the user's time zone. */
 		today: PlainDate;
 		onCreated: (created: { kind: TransactionKind; name: string; date: PlainDate }) => void;
 	} = $props();
 
-	type Field = 'name' | 'amount' | 'date' | 'categoryId' | 'notes';
+	type Field = 'name' | 'amount' | 'date' | 'categoryId' | 'notes' | 'paymentMethodId';
 
 	let name = $state('');
 	let amount = $state('');
 	let notes = $state('');
 	let categoryId = $state('');
+	let paymentMethodId = $state('');
 	// svelte-ignore state_referenced_locally
 	let date = $state<PlainDate | null>(today);
 	let errors = $state<Partial<Record<Field, string>>>({});
@@ -57,10 +67,20 @@
 
 	// Remember the last category used for each kind during this visit; it's often the same.
 	const lastCategory: Partial<Record<TransactionKind, string>> = {};
+	// Starts on the method from the latest expense; updated as expenses are added on this visit.
+	// svelte-ignore state_referenced_locally
+	let lastMethod = lastPaidWith;
 
 	let categories = $derived(allCategories[kind]);
 	let label = $derived(kind === 'expense' ? 'expense' : 'income');
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
+	let selectedMethod = $derived(paymentMethods.find((m) => m.id === paymentMethodId));
+	// For a credit card with a closing day: which statement this purchase lands on.
+	let statementNote = $derived(
+		selectedMethod?.kind === 'credit' && selectedMethod.closingDay && date
+			? `Goes on the statement that closes ${formatDate(nextOnDay(date, selectedMethod.closingDay))}.`
+			: ''
+	);
 	let amountHint = $derived(amount && parseAmount(amount) === null ? 'Like 12.50' : '');
 
 	// On the transactions page, keep the current range and tab in the URL; `/create` picks the
@@ -93,6 +113,8 @@
 		date = today;
 		const last = lastCategory[kind];
 		categoryId = last && categories.some((c) => c.id === last) ? last : '';
+		paymentMethodId =
+			lastMethod && paymentMethods.some((m) => m.id === lastMethod) ? lastMethod : '';
 	}
 
 	// Dates run 1940 to next year (so a payment due in early January can be entered).
@@ -128,6 +150,7 @@
 						pending = false;
 						if (result.type === 'success') {
 							lastCategory[kind] = categoryId;
+							if (kind === 'expense') lastMethod = paymentMethodId;
 							open = false;
 							onCreated({
 								kind,
@@ -281,6 +304,92 @@
 						<p class="text-xs text-gray-500">No {label} categories yet.</p>
 					{/if}
 				</div>
+
+				{#if kind === 'expense' && paymentMethods.length > 0}
+					<div class="flex flex-col gap-1">
+						<span id="add-paid-label" class={fieldLabel}>
+							Paid with <span class="font-normal text-gray-500">(optional)</span>
+						</span>
+						<Select.Root
+							type="single"
+							name="paymentMethodId"
+							bind:value={paymentMethodId}
+							items={[
+								{ value: '', label: 'Not recorded' },
+								...paymentMethods.map((m) => ({ value: m.id, label: m.name }))
+							]}
+						>
+							<!-- data-no-press: a field, not a button, so it skips the press-to-shrink effect. -->
+							<Select.Trigger
+								data-no-press
+								class="{input} flex items-center gap-2 border px-3 py-2 text-left"
+								aria-labelledby="add-paid-label"
+								aria-invalid={errors.paymentMethodId ? true : undefined}
+							>
+								{#if selectedMethod}
+									<PaymentMethodIcon
+										kind={selectedMethod.kind}
+										class="size-4 shrink-0 text-gray-500"
+									/>
+									<span class="truncate">{selectedMethod.name}</span>
+									{#if selectedMethod.last4}
+										<span class="shrink-0 text-gray-500 tabular-nums">
+											{last4Label(selectedMethod.last4)}
+										</span>
+									{/if}
+								{:else}
+									<span class="text-gray-400">Not recorded</span>
+								{/if}
+								<ChevronDown class="ml-auto size-4 shrink-0 text-gray-500" aria-hidden="true" />
+							</Select.Trigger>
+							<Select.Portal>
+								<Select.Content
+									sideOffset={4}
+									class="z-[60] max-h-72 w-(--bits-select-anchor-width) min-w-48 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg outline-none dark:border-gray-700 dark:bg-gray-900"
+								>
+									<Select.Viewport>
+										<Select.Item
+											value=""
+											label="Not recorded"
+											class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+										>
+											{#snippet children({ selected })}
+												<span class="text-gray-500">Not recorded</span>
+												{#if selected}<Check class="ml-auto size-4" aria-hidden="true" />{/if}
+											{/snippet}
+										</Select.Item>
+										{#each paymentMethods as method (method.id)}
+											<Select.Item
+												value={method.id}
+												label={method.name}
+												class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+											>
+												{#snippet children({ selected })}
+													<PaymentMethodIcon
+														kind={method.kind}
+														class="size-4 shrink-0 text-gray-500"
+													/>
+													<span class="truncate">{method.name}</span>
+													{#if method.last4}
+														<span class="shrink-0 text-xs text-gray-500 tabular-nums">
+															{last4Label(method.last4)}
+														</span>
+													{/if}
+													{#if selected}<Check class="ml-auto size-4" aria-hidden="true" />{/if}
+												{/snippet}
+											</Select.Item>
+										{/each}
+									</Select.Viewport>
+								</Select.Content>
+							</Select.Portal>
+						</Select.Root>
+						{#if errors.paymentMethodId}
+							<p class={errorText}>{errors.paymentMethodId}</p>
+						{:else if statementNote}
+							<p class="text-xs text-gray-500">{statementNote}</p>
+						{/if}
+					</div>
+				{/if}
 
 				<div class="flex flex-col gap-1">
 					<label for="add-notes" class={fieldLabel}>

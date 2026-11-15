@@ -43,6 +43,9 @@ export const load: PageServerLoad = ({ url }) => {
 			categoryName: category.name,
 			categoryColor: null,
 			categoryIcon: i % 11 === 10 ? null : category.icon,
+			paymentMethodKind: i % 4 === 3 ? null : (['credit', 'debit', 'cash'] as const)[i % 3],
+			paymentMethodName: i % 4 === 3 ? null : ['Chase Sapphire', 'Checking', 'Cash'][i % 3],
+			paymentMethodLast4: i % 4 === 3 || i % 3 === 2 ? null : ['4821', '5532'][i % 3],
 			createdAt: new Date()
 		};
 	});

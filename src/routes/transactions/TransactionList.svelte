@@ -2,7 +2,9 @@
 	@component
 	Compact transaction rows for small screens:
 	[icon] 01/31/2026  Name  $Amount  [⋯]
-	The ⋯ button expands the row to show the full name, category and notes.
+	On expenses, what it was paid with shows small under the name ("Chase Sapphire ••4821") when
+	recorded. The ⋯ button expands the row to show the full name, category, payment method and
+	notes.
 	Virtualized against the page scroll: only rows near the screen are rendered, and each
 	row is measured so expanded rows push the ones below down.
 -->
@@ -14,6 +16,8 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { slide } from 'svelte/transition';
 	import { categoryIcon } from '#lib/category-icons.ts';
+	import PaymentMethodIcon from '#lib/components/PaymentMethodIcon.svelte';
+	import { last4Label } from '#lib/payment-methods.ts';
 	import { formatNumericDate } from '#lib/date-range.ts';
 	import { formatCents } from '#lib/money.ts';
 	import type { TransactionRow } from '#lib/server/budget/transactions.ts';
@@ -24,6 +28,7 @@
 		selected,
 		selecting = false,
 		onDelete,
+		paidWith = false,
 		active = true
 	}: {
 		rows: TransactionRow[];
@@ -33,6 +38,8 @@
 		selecting?: boolean;
 		/** Asks the page to confirm and delete these rows (the details' Delete button). */
 		onDelete: (ids: string[]) => void;
+		/** Show what each row was paid with (the expenses tab; income has none). */
+		paidWith?: boolean;
 		/** False while hidden by CSS: hidden rows measure 0px tall, so all of them would render. */
 		active?: boolean;
 	} = $props();
@@ -118,7 +125,20 @@
 				<span class="shrink-0 text-xs text-gray-500 tabular-nums"
 					>{formatNumericDate(row.date)}</span
 				>
-				<span class="min-w-0 flex-1 truncate">{row.name}</span>
+				{#if paidWith && row.paymentMethodKind && row.paymentMethodName}
+					<span class="flex min-w-0 flex-1 flex-col">
+						<span class="truncate">{row.name}</span>
+						<span class="flex items-center gap-1 text-xs text-gray-500">
+							<PaymentMethodIcon kind={row.paymentMethodKind} class="size-3 shrink-0" />
+							<span class="truncate">
+								{row.paymentMethodName}
+								{last4Label(row.paymentMethodLast4)}
+							</span>
+						</span>
+					</span>
+				{:else}
+					<span class="min-w-0 flex-1 truncate">{row.name}</span>
+				{/if}
 				<span class="shrink-0 font-medium tabular-nums">{formatCents(row.amountCents)}</span>
 				<button
 					type="button"
@@ -142,6 +162,18 @@
 						<dd class="break-words">{row.name}</dd>
 						<dt class="text-gray-500">Category</dt>
 						<dd>{row.categoryName}</dd>
+						{#if paidWith}
+							<dt class="text-gray-500">Paid with</dt>
+							{#if row.paymentMethodKind && row.paymentMethodName}
+								<dd class="flex items-center gap-1.5">
+									<PaymentMethodIcon kind={row.paymentMethodKind} class="size-3.5 text-gray-500" />
+									{row.paymentMethodName}
+									{last4Label(row.paymentMethodLast4)}
+								</dd>
+							{:else}
+								<dd class="text-gray-400 italic">Not recorded</dd>
+							{/if}
+						{/if}
 						<dt class="text-gray-500">Notes</dt>
 						<dd class={row.notes ? '' : 'text-gray-400 italic'}>{row.notes ?? 'No notes'}</dd>
 					</dl>
