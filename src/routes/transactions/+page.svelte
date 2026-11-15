@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash from '@lucide/svelte/icons/trash';
 	import { Tabs } from 'bits-ui';
 	import { toast } from 'svelte-sonner';
@@ -124,6 +125,46 @@
 		});
 	}
 
+	// Editing: the same dialog in edit mode, opened from a row (phone ⋯ details, double-click or
+	// Enter in the table) or the Edit button when exactly one row is ticked.
+	let editRow = $state<TransactionRow | null>(null);
+	let editKind = $state<TransactionKind>('expense');
+	let editOpen = $state(false);
+	function openEdit(kind: TransactionKind, row: TransactionRow | undefined) {
+		if (!row) return;
+		editKind = kind;
+		editRow = row;
+		editOpen = true;
+	}
+
+	function onSaved({ date }: { kind: TransactionKind; name: string; date: PlainDate }) {
+		const inRange =
+			Temporal.PlainDate.compare(date, data.range.from) >= 0 &&
+			Temporal.PlainDate.compare(date, data.range.to) <= 0;
+		if (inRange) {
+			toast.success('Saved changes.');
+			return;
+		}
+		// The new date moved it out of view: say so and offer to go there.
+		toast.success('Saved changes.', {
+			description: `${formatDate(date)} is outside the dates you’re viewing.`,
+			action: {
+				label: 'Show',
+				onClick: () =>
+					goto(
+						resolve(
+							`/transactions${updateQuery(page.url.search, monthRangeParams(date, data.today))}`
+						)
+					)
+			}
+		});
+	}
+
+	function onEditDeleted({ kind, name }: { kind: TransactionKind; name: string }) {
+		if (editRow) selections[kind].delete(editRow.id);
+		toast.success(`Deleted “${name}”.`);
+	}
+
 	function selectTab(value: string) {
 		const query = updateQuery(page.url.search, { tab: value === 'income' ? 'income' : null });
 		// Shallow + replace: updates the URL without reloading data or adding a history entry.
@@ -201,6 +242,21 @@
 						>
 							Clear
 						</button>
+						{#if selected.size === 1}
+							<!-- Larger screens; phones edit from the row's ⋯ details. -->
+							<button
+								type="button"
+								class="hidden items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 font-medium hover:bg-gray-100 sm:flex dark:border-gray-700 dark:hover:bg-gray-800"
+								onclick={() =>
+									openEdit(
+										kind,
+										rows.find((row) => selected.has(row.id))
+									)}
+							>
+								<Pencil class="size-4" aria-hidden="true" />
+								Edit
+							</button>
+						{/if}
 						<button
 							type="button"
 							class="flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 font-medium text-white hover:bg-red-700"
@@ -223,6 +279,7 @@
 					{selected}
 					{selecting}
 					onDelete={(ids) => confirmDelete(kind, ids)}
+					onEdit={(row) => openEdit(kind, row)}
 					paidWith={kind === 'expense'}
 					active={wide.current !== true}
 				/>
@@ -232,6 +289,7 @@
 					{rows}
 					{label}
 					{selected}
+					onEdit={(row) => openEdit(kind, row)}
 					paidWith={kind === 'expense'}
 					active={wide.current !== false}
 				/>
@@ -301,6 +359,18 @@
 	lastPaidWith={data.lastPaidWith}
 	today={data.today}
 	{onCreated}
+/>
+
+<AddTransactionDialog
+	bind:open={editOpen}
+	bind:kind={editKind}
+	editing={editRow}
+	categories={data.categories}
+	paymentMethods={data.paymentMethods}
+	today={data.today}
+	onCreated={() => {}}
+	{onSaved}
+	onDeleted={onEditDeleted}
 />
 
 {#if pendingDelete}

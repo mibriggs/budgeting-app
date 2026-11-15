@@ -4,12 +4,13 @@
 	[icon] 01/31/2026  Name  $Amount  [⋯]
 	On expenses, what it was paid with shows small under the name ("Chase Sapphire ••4821") when
 	recorded. The ⋯ button expands the row to show the full name, category, payment method and
-	notes.
+	notes, with Edit and Delete.
 	Virtualized against the page scroll: only rows near the screen are rendered, and each
 	row is measured so expanded rows push the ones below down.
 -->
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import Pencil from '@lucide/svelte/icons/pencil';
 	import Trash from '@lucide/svelte/icons/trash';
 	import { cubicOut } from 'svelte/easing';
 	import { prefersReducedMotion } from 'svelte/motion';
@@ -28,6 +29,7 @@
 		selected,
 		selecting = false,
 		onDelete,
+		onEdit,
 		paidWith = false,
 		active = true
 	}: {
@@ -38,6 +40,8 @@
 		selecting?: boolean;
 		/** Asks the page to confirm and delete these rows (the details' Delete button). */
 		onDelete: (ids: string[]) => void;
+		/** Asks the page to open the edit form for this row (the details' Edit button). */
+		onEdit: (row: TransactionRow) => void;
 		/** Show what each row was paid with (the expenses tab; income has none). */
 		paidWith?: boolean;
 		/** False while hidden by CSS: hidden rows measure 0px tall, so all of them would render. */
@@ -159,7 +163,7 @@
 				>
 					<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-3 pt-2 text-xs">
 						<dt class="text-gray-500">Name</dt>
-						<dd class="break-words">{row.name}</dd>
+						<dd class="wrap-break-word">{row.name}</dd>
 						<dt class="text-gray-500">Category</dt>
 						<dd>{row.categoryName}</dd>
 						{#if paidWith}
@@ -177,7 +181,15 @@
 						<dt class="text-gray-500">Notes</dt>
 						<dd class={row.notes ? '' : 'text-gray-400 italic'}>{row.notes ?? 'No notes'}</dd>
 					</dl>
-					<div class="flex justify-end px-1 pb-1">
+					<div class="flex justify-end gap-1 px-1 pb-1">
+						<button
+							type="button"
+							class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800"
+							onclick={() => onEdit(row)}
+						>
+							<Pencil class="size-3.5" aria-hidden="true" />
+							Edit
+						</button>
 						<button
 							type="button"
 							class="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"

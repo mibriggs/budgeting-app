@@ -1,10 +1,17 @@
 <!--
 	@component
 	Dialog for adding one expense or income entry: type (Expense | Income), name, amount, date,
-	category, what it was paid with (expenses only, optional) and notes. The page picks the starting type; the switch at the top changes it.
-	Submits to the transactions page's `create` action (src/routes/transactions/+page.server.ts),
-	which validates everything and returns per-field errors; the current page's data reloads
-	after a successful add. Used on the transactions page and the home page.
+	category, what it was paid with (expenses only, optional) and notes. The page picks the
+	starting type; the switch at the top changes it. Submits to the transactions page's `create`
+	action (src/routes/transactions/+page.server.ts), which validates everything and returns
+	per-field errors; the current page's data reloads after a successful add. Used on the
+	transactions page and the home page.
+
+	Edit mode (pass `editing`, transactions page only): the same form pre-filled with that row,
+	posting to `update`. No type switch (an expense can't become income). Save stays off until
+	something changes. Delete is in the form too, after a confirm. A charge a recurring expense
+	added says that editing it changes only that charge. An archived category or removed payment
+	method the row already has stays pickable for it.
 -->
 <script lang="ts">
 	import Check from '@lucide/svelte/icons/check';
@@ -20,7 +27,8 @@
 	import { last4Label, nextOnDay, type PaymentMethodOption } from '#lib/payment-methods.ts';
 	import { Temporal, type PlainDate } from '#lib/dates.ts';
 	import type { CategoryOption } from '#lib/server/budget/categories.ts';
-	import type { TransactionKind } from '#lib/server/budget/transactions.ts';
+	import Repeat from '@lucide/svelte/icons/repeat';
+	import type { TransactionKind, TransactionRow } from '#lib/server/budget/transactions.ts';
 	import { MAX_NAME_LENGTH, MAX_NOTES_LENGTH, parseAmount } from '#lib/transaction-input.ts';
 
 	let {
@@ -29,9 +37,12 @@
 		categories: allCategories,
 		today,
 		action: actionOverride,
-		paymentMethods = [],
+		paymentMethods: activeMethods = [],
 		lastPaidWith = null,
-		onCreated
+		editing = null,
+		onCreated,
+		onSaved,
+		onDeleted
 	}: {
 		open?: boolean;
 		/** Which type the form starts on; the switch in the dialog updates it. */
@@ -50,6 +61,12 @@
 		/** Default date: today in the user's time zone. */
 		today: PlainDate;
 		onCreated: (created: { kind: TransactionKind; name: string; date: PlainDate }) => void;
+		/** The row to edit; null (the default) adds a new one instead. */
+		editing?: TransactionRow | null;
+		/** After an edit is saved. */
+		onSaved?: (saved: { kind: TransactionKind; name: string; date: PlainDate }) => void;
+		/** After the row being edited is deleted from the form. */
+		onDeleted?: (deleted: { kind: TransactionKind; name: string }) => void;
 	} = $props();
 
 	type Field = 'name' | 'amount' | 'date' | 'categoryId' | 'notes' | 'paymentMethodId';
@@ -64,6 +81,7 @@
 	let errors = $state<Partial<Record<Field, string>>>({});
 	let formError = $state('');
 	let pending = $state(false);
+	let confirmDelete = $state(false);
 
 	// Remember the last category used for each kind during this visit; it's often the same.
 	const lastCategory: Partial<Record<TransactionKind, string>> = {};
@@ -71,7 +89,30 @@
 	// svelte-ignore state_referenced_locally
 	let lastMethod = lastPaidWith;
 
-	let categories = $derived(allCategories[kind]);
+	// When editing, the row's own category and payment method stay pickable even if archived.
+	let categories = $derived.by(() => {
+		const list = allCategories[kind];
+		if (!editing || list.some((c) => c.id === editing.categoryId)) return list;
+		return [
+			...list,
+			{ id: editing.categoryId, name: editing.categoryName, icon: editing.categoryIcon }
+		];
+	});
+	let paymentMethods = $derived.by<PaymentMethodOption[]>(() => {
+		const e = editing;
+		if (!e?.paymentMethodId || !e.paymentMethodKind || !e.paymentMethodName) return activeMethods;
+		if (activeMethods.some((m) => m.id === e.paymentMethodId)) return activeMethods;
+		return [
+			...activeMethods,
+			{
+				id: e.paymentMethodId,
+				kind: e.paymentMethodKind,
+				name: e.paymentMethodName,
+				last4: e.paymentMethodLast4,
+				closingDay: null
+			}
+		];
+	});
 	let label = $derived(kind === 'expense' ? 'expense' : 'income');
 	let selectedCategory = $derived(categories.find((c) => c.id === categoryId));
 	let selectedMethod = $derived(paymentMethods.find((m) => m.id === paymentMethodId));
@@ -85,9 +126,21 @@
 
 	// On the transactions page, keep the current range and tab in the URL; `/create` picks the
 	// form action.
-	let action = $derived(
-		actionOverride ?? `${page.url.search ? `${page.url.search}&` : '?'}/create`
-	);
+	const pageAction = (name: string) => `${page.url.search ? `${page.url.search}&` : '?'}/${name}`;
+	let action = $derived(editing ? pageAction('update') : (actionOverride ?? pageAction('create')));
+
+	// Edit mode: Save only once something differs from the row.
+	let changed = $derived.by(() => {
+		if (!editing) return true;
+		return (
+			name.trim() !== editing.name ||
+			parseAmount(amount) !== editing.amountCents ||
+			!date?.equals(editing.date) ||
+			categoryId !== editing.categoryId ||
+			notes.trim() !== (editing.notes ?? '') ||
+			(kind === 'expense' && paymentMethodId !== (editing.paymentMethodId ?? ''))
+		);
+	});
 
 	// Start fresh each time the dialog opens. An effect rather than Bits' onOpenChange, which only
 	// fires when the dialog opens itself (trigger/Escape), not when the page sets `open = true`.
@@ -105,6 +158,18 @@
 	}
 
 	function reset() {
+		confirmDelete = false;
+		if (editing) {
+			name = editing.name;
+			amount = (editing.amountCents / 100).toFixed(2);
+			notes = editing.notes ?? '';
+			errors = {};
+			formError = '';
+			date = editing.date;
+			categoryId = editing.categoryId;
+			paymentMethodId = editing.paymentMethodId ?? '';
+			return;
+		}
 		name = '';
 		amount = '';
 		notes = '';
@@ -137,18 +202,42 @@
 		<Dialog.Content
 			class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md -translate-1/2 overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 text-gray-900 shadow-xl outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 		>
-			<Dialog.Title class="text-base font-semibold">Add {label}</Dialog.Title>
+			<Dialog.Title class="text-base font-semibold">
+				{editing ? 'Edit' : 'Add'}
+				{label}
+			</Dialog.Title>
+
+			{#if editing?.recurringName}
+				<p
+					class="mt-3 flex items-start gap-2 rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600 dark:bg-gray-800/60 dark:text-gray-300"
+				>
+					<Repeat class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+					<span>
+						Added by your recurring “{editing.recurringName}”. Changes here only affect this charge,
+						not future ones.
+					</span>
+				</p>
+			{/if}
 
 			<form
 				method="post"
 				{action}
 				class="mt-4 flex flex-col gap-4"
-				use:enhance={() => {
+				use:enhance={({ action: submitted }) => {
+					const deleting = submitted.search.includes('/delete');
 					pending = true;
 					formError = '';
 					return async ({ result, update }) => {
 						pending = false;
-						if (result.type === 'success') {
+						if (result.type === 'success' && deleting) {
+							open = false;
+							onDeleted?.({ kind, name: editing?.name ?? name.trim() });
+							await update({ reset: false });
+						} else if (result.type === 'success' && editing) {
+							open = false;
+							onSaved?.({ kind, name: name.trim(), date: date ?? today });
+							await update({ reset: false });
+						} else if (result.type === 'success') {
 							lastCategory[kind] = categoryId;
 							if (kind === 'expense') lastMethod = paymentMethodId;
 							open = false;
@@ -162,37 +251,44 @@
 							await update({ reset: false, navigate: false });
 						} else if (result.type === 'failure') {
 							errors = (result.data?.errors as typeof errors) ?? {};
+							if (result.data?.error) formError = String(result.data.error);
+							confirmDelete = false;
 						} else if (result.type === 'error') {
 							formError = navigator.onLine
 								? 'Something went wrong. Please try again.'
-								: "You're offline. Adding needs a connection.";
+								: `You're offline. ${editing ? 'Saving' : 'Adding'} needs a connection.`;
 						} else {
 							await update();
 						}
 					};
 				}}
 			>
-				<!-- Type: a two-option radio group styled as a segmented switch. -->
-				<fieldset
-					class="grid grid-cols-2 gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700"
-				>
-					<legend class="sr-only">Type</legend>
-					{#each [['expense', 'Expense'], ['income', 'Income']] as const as [value, text] (value)}
-						<label
-							class="cursor-pointer rounded px-3 py-1.5 text-center text-sm font-medium text-gray-600 transition hover:text-gray-900 has-checked:bg-gray-900 has-checked:text-white has-focus-visible:ring-2 has-focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:text-gray-100 dark:has-checked:bg-white dark:has-checked:text-gray-900"
-						>
-							<input
-								type="radio"
-								name="kind"
-								{value}
-								checked={kind === value}
-								onchange={() => setKind(value)}
-								class="sr-only"
-							/>
-							{text}
-						</label>
-					{/each}
-				</fieldset>
+				{#if editing}
+					<input type="hidden" name="kind" value={kind} />
+					<input type="hidden" name="id" value={editing.id} />
+				{:else}
+					<!-- Type: a two-option radio group styled as a segmented switch. -->
+					<fieldset
+						class="grid grid-cols-2 gap-0.5 rounded-md border border-gray-200 p-0.5 dark:border-gray-700"
+					>
+						<legend class="sr-only">Type</legend>
+						{#each [['expense', 'Expense'], ['income', 'Income']] as const as [value, text] (value)}
+							<label
+								class="cursor-pointer rounded px-3 py-1.5 text-center text-sm font-medium text-gray-600 transition hover:text-gray-900 has-checked:bg-gray-900 has-checked:text-white has-focus-visible:ring-2 has-focus-visible:ring-gray-400 dark:text-gray-400 dark:hover:text-gray-100 dark:has-checked:bg-white dark:has-checked:text-gray-900"
+							>
+								<input
+									type="radio"
+									name="kind"
+									{value}
+									checked={kind === value}
+									onchange={() => setKind(value)}
+									class="sr-only"
+								/>
+								{text}
+							</label>
+						{/each}
+					</fieldset>
+				{/if}
 
 				<div class="flex flex-col gap-1">
 					<label for="add-name" class={fieldLabel}>Name</label>
@@ -410,21 +506,58 @@
 					<p class="text-sm text-red-700 dark:text-red-400" role="alert">{formError}</p>
 				{/if}
 
-				<div class="flex justify-end gap-2">
-					<Dialog.Close
-						type="button"
-						class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+				{#if confirmDelete && editing}
+					<div
+						class="flex flex-col gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm dark:border-red-900 dark:bg-red-950/40"
 					>
-						Cancel
-					</Dialog.Close>
-					<button
-						type="submit"
-						disabled={pending}
-						class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-60 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
-					>
-						{pending ? 'Adding…' : `Add ${label}`}
-					</button>
-				</div>
+						<p>Delete <strong>{editing.name}</strong>? This can’t be undone.</p>
+						<div class="flex justify-end gap-2">
+							<button
+								type="button"
+								onclick={() => (confirmDelete = false)}
+								class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+							>
+								Keep
+							</button>
+							<button
+								formaction={pageAction('delete')}
+								disabled={pending}
+								class="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-60"
+							>
+								{pending ? 'Deleting…' : 'Delete'}
+							</button>
+						</div>
+					</div>
+				{:else}
+					<div class="flex items-center justify-end gap-2">
+						{#if editing}
+							<button
+								type="button"
+								onclick={() => (confirmDelete = true)}
+								class="mr-auto rounded-md px-2 py-1.5 text-sm text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+							>
+								Delete
+							</button>
+						{/if}
+						<Dialog.Close
+							type="button"
+							class="rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+						>
+							Cancel
+						</Dialog.Close>
+						<button
+							type="submit"
+							disabled={pending || !changed}
+							class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200"
+						>
+							{#if editing}
+								{pending ? 'Saving…' : 'Save'}
+							{:else}
+								{pending ? 'Adding…' : `Add ${label}`}
+							{/if}
+						</button>
+					</div>
+				{/if}
 			</form>
 		</Dialog.Content>
 	</Dialog.Portal>

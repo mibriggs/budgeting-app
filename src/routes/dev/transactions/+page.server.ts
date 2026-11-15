@@ -46,6 +46,8 @@ export const load: PageServerLoad = ({ url }) => {
 			paymentMethodKind: i % 4 === 3 ? null : (['credit', 'debit', 'cash'] as const)[i % 3],
 			paymentMethodName: i % 4 === 3 ? null : ['Chase Sapphire', 'Checking', 'Cash'][i % 3],
 			paymentMethodLast4: i % 4 === 3 || i % 3 === 2 ? null : ['4821', '5532'][i % 3],
+			paymentMethodId: null,
+			recurringName: i % 9 === 0 ? 'Rent' : null,
 			createdAt: new Date()
 		};
 	});

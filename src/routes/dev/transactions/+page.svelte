@@ -101,6 +101,7 @@
 			{selected}
 			{selecting}
 			onDelete={confirmDelete}
+			onEdit={() => {}}
 			paidWith
 			active={wide.current !== true}
 		/>
@@ -110,6 +111,7 @@
 			rows={data.rows}
 			label="Preview"
 			{selected}
+			onEdit={() => {}}
 			paidWith
 			active={wide.current !== false}
 		/>

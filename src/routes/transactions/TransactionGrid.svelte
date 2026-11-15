@@ -4,6 +4,7 @@
 	header showing each column's name and type, row numbers, and sortable columns. Expenses also
 	get a "Paid with" column (NULL when not recorded).
 	Checkboxes select rows (Shift-click selects a range); the header box selects the whole tab.
+	Double-click a row, or Tab to it and press Enter, to edit it (the page opens the edit form).
 	Only the rows in view are rendered (virtualized), so thousands of rows scroll smoothly.
 	As tall as its rows, up to its parent's height; past that it scrolls inside itself.
 -->
@@ -25,6 +26,7 @@
 		rows,
 		label,
 		selected,
+		onEdit,
 		paidWith = false,
 		active = true
 	}: {
@@ -32,6 +34,8 @@
 		label: string;
 		/** IDs of ticked rows. Shared with the page, which owns deleting them. */
 		selected: SvelteSet<string>;
+		/** Asks the page to open the edit form for this row. */
+		onEdit: (row: TransactionRow) => void;
 		/** Add the "Paid with" column (the expenses tab; income has none). */
 		paidWith?: boolean;
 		/** False while hidden by CSS, so it doesn't render rows nobody can see. */
@@ -118,7 +122,7 @@
 	aria-rowcount={sorted.length + 1}
 >
 	<!-- Wide enough for every column's minimum, so row backgrounds span the full width. -->
-	<div class={paidWith ? 'min-w-[79rem]' : 'min-w-[64rem]'}>
+	<div class={paidWith ? 'min-w-316' : 'min-w-5xl'}>
 		<!-- Header: sticks to the top while the body scrolls under it. -->
 		<div
 			role="row"
@@ -199,8 +203,18 @@
 					role="row"
 					aria-rowindex={item.index + 2}
 					aria-selected={isSelected}
+					tabindex="0"
+					title="Double-click to edit"
+					ondblclick={(event) => {
+						// Double-clicking the checkbox only ticks it.
+						if ((event.target as HTMLElement).closest('input')) return;
+						onEdit(row);
+					}}
+					onkeydown={(event) => {
+						if (event.key === 'Enter' && event.target === event.currentTarget) onEdit(row);
+					}}
 					class={[
-						'group absolute inset-x-0 top-0 grid border-gray-100 dark:border-gray-800/60',
+						'group absolute inset-x-0 top-0 grid cursor-default border-gray-100 outline-none select-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-inset dark:border-gray-800/60',
 						// The box's own border closes off the last row.
 						item.index < sorted.length - 1 && 'border-b',
 						background
