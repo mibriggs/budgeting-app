@@ -85,6 +85,13 @@
       "when": 1794771240599,
       "tag": "0011_home_card_setting",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794772336201,
+      "tag": "0012_push_session",
+      "breakpoints": true
     }
   ]
 }

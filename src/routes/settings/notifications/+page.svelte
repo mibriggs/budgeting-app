@@ -318,7 +318,12 @@
 								{/if}
 							</span>
 							<span class="text-xs text-gray-500 dark:text-gray-400">
-								Added {added(device.createdAt)}
+								{#if device.signedIn}
+									Added {added(device.createdAt)}
+								{:else}
+									<span class="font-medium text-amber-700 dark:text-amber-400">Paused</span> · signed
+									out there. Resumes when you sign in on it.
+								{/if}
 							</span>
 						</div>
 						<button

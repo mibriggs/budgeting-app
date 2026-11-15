@@ -12,6 +12,30 @@
 	// Light/dark/system theme from the user menu; also follows the device setting on "system".
 	$effect(() => theme.init());
 
+	// Notifications follow the sign-in: if this browser still has a subscription (say the session
+	// expired and the user just signed in again), link it to this session so reminders resume.
+	// The server only does that for the same account; for another account it removes the old
+	// device and we drop the browser's copy too. Once per app load.
+	$effect(() => {
+		if (!data.signedIn || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+		(async () => {
+			const reg = await navigator.serviceWorker.getRegistration();
+			const sub = await reg?.pushManager.getSubscription();
+			const keys = sub?.toJSON().keys;
+			if (!sub || !keys?.p256dh || !keys.auth) return;
+			const response = await fetch('/settings/notifications/link', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ endpoint: sub.endpoint, p256dh: keys.p256dh, auth: keys.auth })
+			});
+			if (!response.ok) return;
+			const { status } = (await response.json()) as { status: string };
+			if (status === 'dropped') await sub.unsubscribe();
+		})().catch(() => {
+			// Offline or failed; try again on the next app load.
+		});
+	});
+
 	// Keep the user's saved time zone in sync with this browser so "today" and
 	// "this month" match their clock. Reloads data once if it changed.
 	$effect(() => {

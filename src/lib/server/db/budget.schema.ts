@@ -20,7 +20,7 @@ import {
 	uniqueIndex,
 	type AnySQLiteColumn
 } from 'drizzle-orm/sqlite-core';
-import { user } from './auth.schema';
+import { session, user } from './auth.schema';
 import { plainDate, plainYearMonth, timestamps, uuid } from './columns';
 
 const notBlank = (column: AnySQLiteColumn): SQL => sql`length(trim(${column})) > 0`;
@@ -306,6 +306,11 @@ export const pushSubscription = sqliteTable(
 		auth: text('auth').notNull(),
 		/** e.g. "iPhone · Safari", from the browser's user agent when it was turned on. */
 		label: text('label').notNull(),
+		// The sign-in this device's notifications belong to. Nothing is sent while it's NULL (signed
+		// out elsewhere: the session row was deleted) or the session has expired; signing back in
+		// on the device links it again (POST /settings/notifications/link). NULL for devices
+		// turned on before this column existed, until they next open the app.
+		sessionId: text('session_id').references(() => session.id, { onDelete: 'set null' }),
 		...timestamps
 	},
 	(t) => [

@@ -4,12 +4,16 @@
 // Mozilla's push service, plus keys to encrypt to it). notify() signs each message with our
 // VAPID keys and sends it there; the push service delivers it even when the app is closed, and
 // the service worker (src/service-worker/index.ts) shows it. No third-party account involved.
+//
+// Each device belongs to the sign-in (session) that turned it on. Nothing is sent to a device
+// whose session has ended (signed out elsewhere, or expired), so a phone you're logged out of
+// stops showing your amounts. Signing back in on it links it to the new session again.
 
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray } from 'drizzle-orm';
 import webpush, { WebPushError } from 'web-push';
 import { VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY, VAPID_SUBJECT } from '$app/env/private';
 import { db } from '#lib/server/db/index.ts';
-import { pushSubscription } from '#lib/server/db/schema.ts';
+import { pushSubscription, session } from '#lib/server/db/schema.ts';
 
 /** False until all three VAPID env vars are set; then nothing can be sent or subscribed. */
 export const pushConfigured = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY && VAPID_SUBJECT);
@@ -31,18 +35,28 @@ export type PushPayload = {
 // ---------------------------------------------------------------------------
 // Devices
 
-/** The user's devices with notifications on, newest first. */
-export function listDevices(userId: string) {
-	return db
+/**
+ * The user's devices with notifications on, oldest first. `signedIn` is false for a device whose
+ * session has ended: nothing is sent to it until the user signs in there again.
+ */
+export async function listDevices(userId: string) {
+	const now = Date.now();
+	const rows = await db
 		.select({
 			id: pushSubscription.id,
 			endpoint: pushSubscription.endpoint,
 			label: pushSubscription.label,
-			createdAt: pushSubscription.createdAt
+			createdAt: pushSubscription.createdAt,
+			sessionExpiresAt: session.expiresAt
 		})
 		.from(pushSubscription)
+		.leftJoin(session, eq(pushSubscription.sessionId, session.id))
 		.where(eq(pushSubscription.userId, userId))
 		.orderBy(pushSubscription.createdAt);
+	return rows.map(({ sessionExpiresAt, ...device }) => ({
+		...device,
+		signedIn: sessionExpiresAt !== null && sessionExpiresAt.getTime() > now
+	}));
 }
 
 /**
@@ -51,15 +65,46 @@ export function listDevices(userId: string) {
  */
 export async function saveDevice(
 	userId: string,
+	sessionId: string,
 	device: { endpoint: string; p256dh: string; auth: string; label: string }
 ) {
 	await db
 		.insert(pushSubscription)
-		.values({ userId, ...device })
+		.values({ userId, sessionId, ...device })
 		.onConflictDoUpdate({
 			target: pushSubscription.endpoint,
-			set: { userId, p256dh: device.p256dh, auth: device.auth, label: device.label }
+			set: { userId, sessionId, p256dh: device.p256dh, auth: device.auth, label: device.label }
 		});
+}
+
+/**
+ * Called when a signed-in page loads on a browser that still has a subscription (e.g. after the
+ * session expired and the user signed in again).
+ * - Same account as before: linked to this session, so notifications resume. Returns 'linked'.
+ * - Another account: the old account's device is removed (it shouldn't start getting this
+ *   account's notifications without asking). Returns 'dropped'; the page then unsubscribes.
+ * - Not saved at all (removed from the device list elsewhere): left alone. Returns 'unknown'.
+ */
+export async function linkDevice(
+	userId: string,
+	sessionId: string,
+	device: { endpoint: string; p256dh: string; auth: string }
+): Promise<'linked' | 'dropped' | 'unknown'> {
+	const [row] = await db
+		.select({ userId: pushSubscription.userId })
+		.from(pushSubscription)
+		.where(eq(pushSubscription.endpoint, device.endpoint))
+		.limit(1);
+	if (!row) return 'unknown';
+	if (row.userId !== userId) {
+		await db.delete(pushSubscription).where(eq(pushSubscription.endpoint, device.endpoint));
+		return 'dropped';
+	}
+	await db
+		.update(pushSubscription)
+		.set({ sessionId, p256dh: device.p256dh, auth: device.auth })
+		.where(eq(pushSubscription.endpoint, device.endpoint));
+	return 'linked';
 }
 
 /** Removes one of the user's devices, by endpoint (this device) or id (from the list). */
@@ -95,15 +140,21 @@ export async function notifyMany(
 ) {
 	if (!pushConfigured || messages.length === 0) return { sent: 0, failed: 0, removed: 0 };
 	const userIds = [...new Set(messages.map((m) => m.userId))];
-	const devices = await db
-		.select()
-		.from(pushSubscription)
-		.where(
-			and(
-				inArray(pushSubscription.userId, userIds),
-				only ? eq(pushSubscription.endpoint, only.endpoint) : undefined
+	// Only devices still signed in (see the note at the top).
+	const devices = (
+		await db
+			.select()
+			.from(pushSubscription)
+			.innerJoin(session, eq(pushSubscription.sessionId, session.id))
+			.where(
+				and(
+					inArray(pushSubscription.userId, userIds),
+					// Linked (the inner join) and not expired, as of now.
+					gt(session.expiresAt, new Date()),
+					only ? eq(pushSubscription.endpoint, only.endpoint) : undefined
+				)
 			)
-		);
+	).map((r) => r.push_subscription);
 
 	const jobs = messages.flatMap((m) =>
 		devices

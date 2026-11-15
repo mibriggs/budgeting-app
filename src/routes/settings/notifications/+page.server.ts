@@ -51,7 +51,9 @@ export const actions: Actions = {
 		};
 		if (!isEndpoint(device.endpoint) || !isKey(device.p256dh) || !isKey(device.auth))
 			return fail(400, { message: 'This browser sent an invalid subscription.' });
-		await saveDevice(locals.user.id, device);
+		// Tied to this sign-in: notifications stop if it ends (see push.ts).
+		if (!locals.session) error(401, 'Not signed in');
+		await saveDevice(locals.user.id, locals.session.id, device);
 		return { subscribed: device.label };
 	},
 
