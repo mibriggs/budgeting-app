@@ -48,11 +48,13 @@
 				month: '2026-12',
 				monthLabel: 'Dec 2026',
 				topCategories: [],
+				moreCategories: [],
 				net: { incomeCents: 0, expenseCents: 0, netCents: 0 }
 			};
 		if (status === 'few')
 			return {
 				...base,
+				moreCategories: [],
 				topCategories: base.topCategories
 					.slice(1, 2)
 					.map((c) => ({ ...c, rank: 1, shareOfSpending: 1 }))
@@ -89,6 +91,14 @@
 	);
 	const max = $derived(Math.max(widget.net.incomeCents, widget.net.expenseCents, 1));
 	const monthShort = $derived(widget.monthLabel.split(' ')[0]);
+	// Small, medium and the Lock Screen show the top 3; large shows up to 7.
+	const top3 = $derived(widget.topCategories);
+	const top7 = $derived([...widget.topCategories, ...widget.moreCategories]);
+	// Large net widget: the last 6 months, earned and spent, against the biggest of them.
+	const monthsMax = $derived(
+		Math.max(1, ...widget.months.map((m) => Math.max(m.incomeCents, m.expenseCents)))
+	);
+	const arrowText = $derived(direction === 'up' ? '↑ ' : direction === 'down' ? '↓ ' : '');
 
 	/** Replaces the whole widget: nothing to show, or showing old data would mislead. */
 	const problem = $derived(
@@ -248,12 +258,179 @@
 	</span>
 {/snippet}
 
+<!-- Medium and large share a layout (the script draws large with the medium layout). -->
+{#snippet topWide(size: 'medium' | 'large')}
+	<!-- Top 3 (medium) or up to 7 (large). Order gives the rank; no medals. -->
+	{@const shown = size === 'large' ? top7 : top3}
+	<article class={['widget spend flex flex-col p-3.5', size]} aria-label="Top spending, {size}">
+		{#if problem}
+			{@render problemView('md')}
+		{:else}
+			<div class="mb-1 flex items-baseline gap-2 text-sm font-semibold">
+				<span class="shrink-0"
+					>Top spending <span class="font-normal text-(--muted)">· {monthShort}</span></span
+				>
+				<!-- The total the percentages are shares of, then when it was updated. -->
+				<span class="figures ml-auto text-xs tabular-nums"
+					>{money(widget.net.expenseCents)}<span class="ml-1 font-normal text-(--muted)">spent</span
+					></span
+				>
+				{@render footer(true)}
+			</div>
+			{#if widget.topCategories.length === 0}
+				<p class="flex flex-1 items-center justify-center text-xs text-(--muted)">
+					No spending yet in {monthShort}
+				</p>
+			{:else}
+				<ul
+					class={[
+						'figures flex flex-1 flex-col gap-2.5',
+						shown.length === (size === 'large' ? 7 : 3) ? 'justify-around' : 'justify-start pt-2'
+					]}
+				>
+					{#each shown as c (c.rank)}
+						{@const b = bar(c)}
+						<li class="flex items-center gap-2.5">
+							{@render chip(c, 'md')}
+							{#if layout === 'bars'}
+								<div class="flex min-w-0 flex-1 flex-col gap-1">
+									<div class="flex items-baseline gap-2">
+										<span class="flex-1 truncate text-[13px] leading-tight font-medium"
+											>{c.name}</span
+										>
+										<span class="text-[13px] leading-tight font-semibold tabular-nums">
+											{money(c.spentCents)}
+										</span>
+									</div>
+									<div class="flex items-center gap-2">
+										<div class="h-1.5 flex-1 overflow-hidden rounded-full bg-(--chip)">
+											<div
+												class="h-full rounded-full"
+												style:width="{b.fill * 100}%"
+												style:background={b.over ? 'var(--down)' : 'var(--bar)'}
+											></div>
+										</div>
+										<span
+											class={[
+												'w-14 text-right text-[10px] leading-none tabular-nums',
+												b.over ? 'text-(--down)' : 'text-(--muted)'
+											]}>{b.label}</span
+										>
+									</div>
+								</div>
+							{:else}
+								<div class="min-w-0 flex-1">
+									<div class="truncate text-[13px] leading-tight font-medium">{c.name}</div>
+									<div
+										class={[
+											'truncate text-[11px] leading-tight',
+											b.over ? 'text-(--down)' : 'text-(--muted)'
+										]}
+									>
+										{secondLine(c)}
+									</div>
+								</div>
+								<span class="text-[13px] font-semibold tabular-nums">{money(c.spentCents)}</span>
+							{/if}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/if}
+	</article>
+{/snippet}
+
+{#snippet netWide(size: 'medium' | 'large')}
+	<!-- Net, medium: the same plus where it came from -->
+	<article
+		class={['widget net flex flex-col justify-center p-3.5', size, problem ? 'flat' : direction]}
+		aria-label="Net cash flow, {size}"
+	>
+		{#if problem}
+			{@render problemView('md')}
+		{:else}
+			<div class="flex gap-4">
+				<div class="flex h-32.5 w-[42%] flex-col">
+					{@render arrow()}
+					<div class="mt-auto text-xs font-semibold">Net cash flow</div>
+					<div class="figures text-[30px] leading-none font-bold tracking-tight tabular-nums">
+						{money(Math.abs(widget.net.netCents))}
+					</div>
+					<div class="mt-1 text-xs text-(--muted)">{widget.monthLabel}</div>
+				</div>
+				<div class="flex min-w-0 flex-1 flex-col justify-center gap-3">
+					{#each [['Earned', widget.net.incomeCents, 'bar-in'], ['Spent', widget.net.expenseCents, 'bar-out']] as const as [label, cents, bar] (label)}
+						<div class="figures flex flex-col gap-1">
+							<div class="flex justify-between text-xs">
+								<span class="text-(--muted)">{label}</span>
+								<span class="font-semibold tabular-nums">{money(cents)}</span>
+							</div>
+							<div class="h-1.5 rounded-full bg-(--chip)">
+								<div
+									class={['h-full rounded-full', bar]}
+									style:width="{(cents / max) * 100}%"
+								></div>
+							</div>
+						</div>
+					{/each}
+					<div class="flex justify-end">{@render footer()}</div>
+				</div>
+			</div>
+			{#if size === 'large'}
+				<!-- Large only: the last 6 months, earned (green) beside spent (red); this month last. -->
+				<div class="mt-4 flex flex-1 flex-col border-t border-(--chip) pt-3">
+					<div class="mb-2 flex items-baseline justify-between text-xs">
+						<span class="font-semibold">Last 6 months</span>
+						<span class="flex items-center gap-2 text-[10px] text-(--muted)">
+							<span class="flex items-center gap-1"
+								><span class="bar-in size-1.5 rounded-full"></span>Earned</span
+							>
+							<span class="flex items-center gap-1"
+								><span class="bar-out size-1.5 rounded-full"></span>Spent</span
+							>
+						</span>
+					</div>
+					<div class="figures flex flex-1 items-end justify-between gap-2">
+						{#each widget.months as m, i (m.month)}
+							{@const isNow = i === widget.months.length - 1}
+							<div class="flex h-full flex-1 flex-col items-center justify-end gap-1">
+								<div class="flex w-full flex-1 items-end justify-center gap-0.5">
+									<div
+										class="bar-in w-2.5 rounded-t"
+										style:height="{(m.incomeCents / monthsMax) * 100}%"
+									></div>
+									<div
+										class="bar-out w-2.5 rounded-t"
+										style:height="{(m.expenseCents / monthsMax) * 100}%"
+									></div>
+								</div>
+								<span class={['text-[10px]', isNow ? 'font-semibold' : 'text-(--muted)']}
+									>{m.label}</span
+								>
+								<span
+									class={[
+										'text-[9px] tabular-nums',
+										m.incomeCents >= m.expenseCents ? 'text-(--up)' : 'text-(--down)'
+									]}
+									>{m.incomeCents >= m.expenseCents ? '+' : '−'}{money(
+										Math.abs(m.incomeCents - m.expenseCents)
+									)}</span
+								>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		{/if}
+	</article>
+{/snippet}
+
 <main class="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6">
 	<header class="flex flex-col gap-1">
 		<h1 class="text-xl font-semibold">Widgets mock</h1>
 		<p class="text-sm text-gray-500">
-			Small (158×158) and medium (338×158) iPhone widgets. Drawn from the planned
-			<code>/api/widget</code> response; the real ones will be a Scriptable script.
+			Drawn the way the Scriptable scripts draw them, from a sample <code>/api/widget</code>
+			response: small and medium (338×158) Home Screen widgets, then large and the Lock Screen.
 		</p>
 	</header>
 
@@ -295,78 +472,7 @@
 		class={['home flex flex-wrap content-start gap-5 rounded-3xl p-5', theme, notice && 'cached']}
 		aria-label="Home Screen preview"
 	>
-		<!-- Top 3, medium. Order gives the rank; no medals. -->
-		<article class="widget medium spend flex flex-col p-3.5" aria-label="Top spending, medium">
-			{#if problem}
-				{@render problemView('md')}
-			{:else}
-				<div class="mb-1 flex items-baseline justify-between gap-2 text-sm font-semibold">
-					<span class="shrink-0"
-						>Top spending <span class="font-normal text-(--muted)">· {monthShort}</span></span
-					>
-					{@render footer(true)}
-				</div>
-				{#if widget.topCategories.length === 0}
-					<p class="flex flex-1 items-center justify-center text-xs text-(--muted)">
-						No spending yet in {monthShort}
-					</p>
-				{:else}
-					<ul
-						class={[
-							'figures flex flex-1 flex-col gap-2.5',
-							widget.topCategories.length === 3 ? 'justify-around' : 'justify-start pt-2'
-						]}
-					>
-						{#each widget.topCategories as c (c.rank)}
-							{@const b = bar(c)}
-							<li class="flex items-center gap-2.5">
-								{@render chip(c, 'md')}
-								{#if layout === 'bars'}
-									<div class="flex min-w-0 flex-1 flex-col gap-1">
-										<div class="flex items-baseline gap-2">
-											<span class="flex-1 truncate text-[13px] leading-tight font-medium"
-												>{c.name}</span
-											>
-											<span class="text-[13px] leading-tight font-semibold tabular-nums">
-												{money(c.spentCents)}
-											</span>
-										</div>
-										<div class="flex items-center gap-2">
-											<div class="h-1.5 flex-1 overflow-hidden rounded-full bg-(--chip)">
-												<div
-													class="h-full rounded-full"
-													style:width="{b.fill * 100}%"
-													style:background={b.over ? 'var(--down)' : 'var(--bar)'}
-												></div>
-											</div>
-											<span
-												class={[
-													'w-14 text-right text-[10px] leading-none tabular-nums',
-													b.over ? 'text-(--down)' : 'text-(--muted)'
-												]}>{b.label}</span
-											>
-										</div>
-									</div>
-								{:else}
-									<div class="min-w-0 flex-1">
-										<div class="truncate text-[13px] leading-tight font-medium">{c.name}</div>
-										<div
-											class={[
-												'truncate text-[11px] leading-tight',
-												b.over ? 'text-(--down)' : 'text-(--muted)'
-											]}
-										>
-											{secondLine(c)}
-										</div>
-									</div>
-									<span class="text-[13px] font-semibold tabular-nums">{money(c.spentCents)}</span>
-								{/if}
-							</li>
-						{/each}
-					</ul>
-				{/if}
-			{/if}
-		</article>
+		{@render topWide('medium')}
 
 		<!-- Top 3, small -->
 		<article class="widget small spend flex flex-col p-3" aria-label="Top spending, small">
@@ -384,10 +490,10 @@
 					<ul
 						class={[
 							'figures flex flex-1 flex-col gap-1.5',
-							widget.topCategories.length === 3 ? 'justify-around' : 'justify-start pt-1'
+							top3.length === 3 ? 'justify-around' : 'justify-start pt-1'
 						]}
 					>
-						{#each widget.topCategories as c (c.rank)}
+						{#each top3 as c (c.rank)}
 							<li class="flex items-center gap-1.5">
 								{@render chip(c, 'sm')}
 								<div class="min-w-0 flex-1">
@@ -412,11 +518,10 @@
 			{#if problem}
 				{@render problemView('sm')}
 			{:else}
-				<div class="flex items-start justify-between gap-2">
-					{@render arrow()}
-					<span class="text-right text-xs leading-tight font-semibold">Net cash<br />flow</span>
-				</div>
-				<div class="figures mt-auto text-[34px] leading-none font-bold tracking-tight tabular-nums">
+				<!-- Arrow on its own row; the title gets the full width (beside the arrow it was cut off). -->
+				{@render arrow()}
+				<div class="mt-auto truncate text-xs font-semibold">Net cash flow</div>
+				<div class="figures text-[34px] leading-none font-bold tracking-tight tabular-nums">
 					{money(Math.abs(widget.net.netCents))}
 				</div>
 				<div class="mt-1 text-xs text-(--muted)">{widget.monthLabel}</div>
@@ -424,41 +529,102 @@
 			{/if}
 		</article>
 
-		<!-- Net, medium: the same plus where it came from -->
-		<article
-			class={['widget medium net flex gap-4 p-3.5', problem ? 'flat' : direction]}
-			aria-label="Net cash flow, medium"
-		>
-			{#if problem}
-				{@render problemView('md')}
-			{:else}
-				<div class="flex w-[42%] flex-col">
-					{@render arrow()}
-					<div class="mt-auto text-xs font-semibold">Net cash flow</div>
-					<div class="figures text-[30px] leading-none font-bold tracking-tight tabular-nums">
-						{money(Math.abs(widget.net.netCents))}
-					</div>
-					<div class="mt-1 text-xs text-(--muted)">{widget.monthLabel}</div>
+		{@render netWide('medium')}
+	</section>
+
+	<h2 class="text-sm font-medium text-gray-500">
+		Large (338×354): up to 7 categories; net cash flow adds the last 6 months
+	</h2>
+	<section
+		class={['home flex flex-wrap content-start gap-5 rounded-3xl p-5', theme, notice && 'cached']}
+		aria-label="Large widgets preview"
+	>
+		{@render topWide('large')}
+		{@render netWide('large')}
+	</section>
+
+	<h2 class="text-sm font-medium text-gray-500">
+		Lock Screen: plain text, tinted by iOS (shown in white on the wallpaper)
+	</h2>
+	<section
+		class="lock flex flex-col gap-4 rounded-3xl p-5 text-white"
+		aria-label="Lock Screen widgets preview"
+	>
+		<div class="flex flex-wrap items-center gap-6 text-sm font-medium">
+			<span>
+				{#if problem}CentJar: {problem.title}{:else}{arrowText}{money(
+						Math.abs(widget.net.netCents)
+					)} net · {monthShort}{/if}
+			</span>
+			<span>
+				{#if problem}CentJar: {problem.title}{:else if widget.topCategories[0]}Top: {widget
+						.topCategories[0].name}
+					{money(widget.topCategories[0].spentCents)}{:else}No spending yet{/if}
+			</span>
+			<span class="text-xs text-white/60">← inline (above the clock)</span>
+		</div>
+		<div class="flex flex-wrap items-center gap-4">
+			{#each ['net', 'top'] as const as which (which)}
+				{@const Icon =
+					problem?.icon ??
+					(which === 'net'
+						? direction === 'up'
+							? ArrowUp
+							: direction === 'down'
+								? ArrowDown
+								: Minus
+						: categoryIcon(widget.topCategories[0]?.icon ?? 'shopping-cart'))}
+				<div
+					class="flex size-18 flex-col items-center justify-center gap-0.5 rounded-full bg-white/15"
+					aria-label="{which === 'net' ? 'Net cash flow' : 'Top spending'}, circular"
+				>
+					<Icon class="size-4" aria-hidden="true" />
+					<span class="text-xs font-bold tabular-nums">
+						{problem
+							? '!'
+							: money(which === 'net' ? Math.abs(widget.net.netCents) : widget.net.expenseCents)}
+					</span>
 				</div>
-				<div class="flex min-w-0 flex-1 flex-col justify-center gap-3">
-					{#each [['Earned', widget.net.incomeCents, 'bar-in'], ['Spent', widget.net.expenseCents, 'bar-out']] as const as [label, cents, bar] (label)}
-						<div class="figures flex flex-col gap-1">
-							<div class="flex justify-between text-xs">
-								<span class="text-(--muted)">{label}</span>
-								<span class="font-semibold tabular-nums">{money(cents)}</span>
-							</div>
-							<div class="h-1.5 rounded-full bg-(--chip)">
-								<div
-									class={['h-full rounded-full', bar]}
-									style:width="{(cents / max) * 100}%"
-								></div>
-							</div>
-						</div>
+			{/each}
+			<div
+				class="flex h-18 w-40 flex-col justify-center rounded-xl bg-white/15 px-2.5 leading-tight"
+			>
+				{#if problem}
+					<span class="text-xs font-semibold">CentJar</span>
+					<span class="truncate text-xs">{problem.title}</span>
+				{:else}
+					<span class="truncate text-xs font-semibold"
+						>Net cash flow · {monthShort}{notice ? ' (old)' : ''}</span
+					>
+					<span class="truncate text-sm font-bold tabular-nums"
+						>{arrowText}{money(Math.abs(widget.net.netCents))}</span
+					>
+					<span class="truncate text-xs"
+						>Earned {money(widget.net.incomeCents)} · Spent {money(widget.net.expenseCents)}</span
+					>
+				{/if}
+			</div>
+			<div
+				class="flex h-18 w-40 flex-col justify-center rounded-xl bg-white/15 px-2.5 leading-tight"
+			>
+				{#if problem}
+					<span class="text-xs font-semibold">CentJar</span>
+					<span class="truncate text-xs">{problem.title}</span>
+				{:else}
+					<span class="truncate text-xs font-semibold"
+						>Top spending · {money(widget.net.expenseCents)}{notice ? ' (old)' : ''}</span
+					>
+					{#each top3 as c, i (c.rank)}
+						<span class={['truncate', i === 0 ? 'text-sm font-bold' : 'text-xs']}
+							>{c.name} {money(c.spentCents)}</span
+						>
+					{:else}
+						<span class="text-xs">No spending yet in {monthShort}</span>
 					{/each}
-					<div class="flex justify-end">{@render footer()}</div>
-				</div>
-			{/if}
-		</article>
+				{/if}
+			</div>
+			<span class="text-xs text-white/60">← circular and rectangular (below the clock)</span>
+		</div>
 	</section>
 
 	<details class="text-sm">
@@ -507,6 +673,14 @@
 	}
 	.medium {
 		width: 338px;
+	}
+	.large {
+		width: 338px;
+		height: 354px;
+	}
+	.lock {
+		background: linear-gradient(160deg, #1e293b, #312e81 60%, #0f172a);
+		font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
 	}
 	/* Last saved numbers: still readable, visibly not current. */
 	.cached :global(.figures) {

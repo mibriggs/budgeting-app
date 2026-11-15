@@ -2,7 +2,7 @@
 	Sign in. GitHub first, then Google (Google's button follows its branding rules: white with a
 	grey border, near-black in dark mode, the unaltered four-colour G). Behind it, a slow "glow"
 	of three soft colour blobs, decorative only and still for Reduce Motion; the content sits on
-	a frosted panel so it stays readable. Design picked in the /dev/sign-in mock.
+	a frosted panel so it stays readable.
 
 	The Google button shows only when GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set.
 -->

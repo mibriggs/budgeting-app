@@ -1,12 +1,12 @@
 // Dev-only mock of the Home Screen widgets (Scriptable), drawn in HTML at iPhone widget sizes.
-// Sample data uses the planned `/api/widget` response shape (future-plans, "Home Screen widget").
+// Sample data uses the `/api/widget` response shape (src/routes/api/widget/+server.ts).
 // No database, no sign-in. 404 outside `npm run dev`.
 
 import { error } from '@sveltejs/kit';
 import { dev } from '$app/env';
 import type { PageServerLoad } from './$types';
 
-/** The planned `/api/widget` response. Money is integer cents. */
+/** The `/api/widget` response, plus mock-only fields. Money is integer cents. */
 export type WidgetData = {
 	asOf: string;
 	month: string;
@@ -24,6 +24,10 @@ export type WidgetData = {
 		leftCents: number | null;
 		shareOfSpending: number;
 	}[];
+	/** Ranks 4–7 (large widget only), same shape as topCategories. */
+	moreCategories: WidgetData['topCategories'];
+	/** The last 6 months, oldest first (this month last), for the large net widget. */
+	months: { month: string; label: string; incomeCents: number; expenseCents: number }[];
 	url: string;
 };
 
@@ -57,26 +61,66 @@ const topCategories: WidgetData['topCategories'] = [
 		limitCents: null,
 		leftCents: null,
 		shareOfSpending: 0.07
-	}
+	},
+	...(
+		[
+			['Gas', 'fuelpump', 'fuel', 18_420, 20_000, 0.044],
+			['Subscriptions', 'repeat', 'repeat', 9_196, null, 0.022],
+			['Pets', 'pawprint', 'paw-print', 8_200, 10_000, 0.02],
+			['Shopping', 'bag', 'shopping-bag', 6_499, 15_000, 0.015],
+			['Coffee', 'cup.and.saucer', 'coffee', 3_250, null, 0.008]
+		] as const
+	).map(([name, sfSymbol, icon, spentCents, limitCents, shareOfSpending], i) => ({
+		rank: i + 4,
+		name,
+		sfSymbol,
+		icon,
+		spentCents,
+		limitCents,
+		leftCents: limitCents === null ? null : limitCents - spentCents,
+		shareOfSpending
+	}))
 ];
+
+// Last 6 months for the large net widget (made up; this month last).
+const months: WidgetData['months'] = [
+	['2026-06', 'Jun', 480_000, 410_000],
+	['2026-07', 'Jul', 480_000, 455_000],
+	['2026-08', 'Aug', 495_000, 520_000],
+	['2026-09', 'Sep', 480_000, 430_000],
+	['2026-10', 'Oct', 510_000, 470_000]
+].map(([month, label, incomeCents, expenseCents]) => ({
+	month: month as string,
+	label: label as string,
+	incomeCents: incomeCents as number,
+	expenseCents: expenseCents as number
+}));
 
 const base = {
 	asOf: '2026-11-13T13:49:00-05:00',
 	month: '2026-11',
 	monthLabel: 'Nov 2026',
-	topCategories,
+	// Like the endpoint: 3 here, ranks 4–7 separately (the 8th sample category isn't sent).
+	topCategories: topCategories.slice(0, 3),
+	moreCategories: topCategories.slice(3, 7),
 	url: 'https://centjar.vercel.app/'
 };
 
 export const load: PageServerLoad = () => {
 	if (!dev) error(404, 'Not found');
 
+	const nov = (incomeCents: number, expenseCents: number) => [
+		...months,
+		{ month: '2026-11', label: 'Nov', incomeCents, expenseCents }
+	];
 	const earnedMore: WidgetData = {
 		...base,
+		months: nov(520_000, 420_000),
 		net: { incomeCents: 520_000, expenseCents: 420_000, netCents: 100_000 }
 	};
 	const spentMore: WidgetData = {
 		...base,
+		months: nov(320_000, 420_000),
 		net: { incomeCents: 320_000, expenseCents: 420_000, netCents: -100_000 }
 	};
 	return { earnedMore, spentMore };

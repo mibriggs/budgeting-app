@@ -7,8 +7,14 @@
 const CACHE_FILE = 'centjar-widget.json';
 const files = FileManager.local();
 const cachePath = files.joinPath(files.documentsDirectory(), CACHE_FILE);
-const family = config.widgetFamily || PREVIEW;
+// The size picked on the Home Screen (it can be changed there without touching the code), or
+// PREVIEW when run in the app. Small has its own layout; medium has another; large and iPad's
+// extra large add more (7 categories, or the last 6 months); the Lock Screen sizes ('accessoryInline', 'accessoryCircular',
+// 'accessoryRectangular') get plain text the system tints (see drawAccessory).
+const family = String(config.widgetFamily || PREVIEW || 'medium');
 const isSmall = family === 'small';
+const isAccessory = family.indexOf('accessory') === 0;
+const isLarge = family === 'large' || family === 'extraLarge';
 
 // Colours that follow the phone's light/dark setting.
 function dyn(light, dark) {
@@ -227,12 +233,64 @@ function drawProblem(widget, problem, chipColor) {
 	return problem === 'no-token' || problem === 'token' ? BASE_URL + '/settings/widget' : BASE_URL;
 }
 
+/**
+ * Lock Screen widgets: a few lines of text (no backgrounds or colours; iOS tints them).
+ * `a` = { inline, symbol, circle, title, lines }: the one-line version, the circular version's
+ * symbol and short text, and the rectangular version's title and up to three lines.
+ */
+function drawAccessory(widget, a) {
+	if (family === 'accessoryInline') {
+		addText(widget, a.inline, Font.systemFont(12), TEXT, 1);
+		return;
+	}
+	if (family === 'accessoryCircular') {
+		widget.addSpacer();
+		const iconRow = widget.addStack();
+		iconRow.addSpacer();
+		const image = iconRow.addImage(symbolImage(a.symbol));
+		image.imageSize = new Size(16, 16);
+		image.tintColor = TEXT;
+		iconRow.addSpacer();
+		const textRow = widget.addStack();
+		textRow.addSpacer();
+		const t = addText(textRow, a.circle, Font.boldSystemFont(12), TEXT, 1);
+		t.minimumScaleFactor = 0.5;
+		textRow.addSpacer();
+		widget.addSpacer();
+		return;
+	}
+	addText(widget, a.title, Font.semiboldSystemFont(12), TEXT, 1);
+	for (let i = 0; i < a.lines.length && i < 3; i++) {
+		const t = addText(
+			widget,
+			a.lines[i],
+			i === 0 ? Font.boldSystemFont(14) : Font.systemFont(12),
+			TEXT,
+			1
+		);
+		t.minimumScaleFactor = 0.7;
+	}
+}
+
+/** A problem on the Lock Screen: just its title (see PROBLEMS). */
+function accessoryProblem(problem) {
+	const title = PROBLEMS[problem][1];
+	return {
+		inline: 'CentJar: ' + title,
+		symbol: PROBLEMS[problem][0],
+		circle: '!',
+		title: 'CentJar',
+		lines: [title]
+	};
+}
+
 /** Shows the widget (or a preview when run in the app) and tells iOS when to check again. */
 async function finish(widget, url) {
 	widget.url = url;
 	widget.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
 	if (config.runsInWidget) Script.setWidget(widget);
 	else if (PREVIEW === 'small') await widget.presentSmall();
+	else if (PREVIEW === 'large') await widget.presentLarge();
 	else await widget.presentMedium();
 	Script.complete();
 }

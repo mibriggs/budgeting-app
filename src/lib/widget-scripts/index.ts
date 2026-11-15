@@ -20,13 +20,24 @@ export const WIDGETS: Record<WidgetKind, { title: string; name: string; body: st
 export function widgetScript(kind: WidgetKind, baseUrl: string, token?: string): string {
 	const header = [
 		`// CentJar · ${WIDGETS[kind].title} widget for Scriptable (https://scriptable.app)`,
-		'// Set up in CentJar: Settings → Widget. Works as a small or medium Home Screen widget.',
+		'// Set up in CentJar: Settings → Widget. Works in any Home Screen size and on the Lock Screen;',
+		'// change the size on the widget itself, nothing here needs editing.',
 		'',
 		'// Your widget token (keep it private; revoke it in Settings → Widget if it leaks).',
 		`const TOKEN = '${token ?? 'PASTE_TOKEN_HERE'}';`,
 		`const BASE_URL = '${baseUrl.replace(/\/+$/, '')}';`,
-		"// Size shown when you run the script in the Scriptable app: 'small' or 'medium'.",
+		"// Size shown when you run the script in the Scriptable app: 'small', 'medium' or 'large'.",
 		"const PREVIEW = 'medium';",
+		...(kind === 'top'
+			? [
+					'',
+					'// Medium and large widgets. What each category shows: its share of this month’s',
+					"// spending ('share') or how much of its budget is used ('budget').",
+					"const SHOW = 'share';",
+					"// As a bar under each category ('bars') or a line of text ('list').",
+					"const LAYOUT = 'bars';"
+				]
+			: []),
 		''
 	].join('\n');
 	return `${header}\n${common}\n${WIDGETS[kind].body}`;

@@ -248,9 +248,9 @@
 			</li>
 			<li>Tap ▶︎ to try it: Scriptable shows a preview.</li>
 			<li>
-				On your Home Screen, add a <span class="font-medium">Scriptable</span> widget (small or
-				medium). Touch and hold it, tap <span class="font-medium">Edit Widget</span>, and pick the
-				script.
+				On your Home Screen (or Lock Screen), add a <span class="font-medium">Scriptable</span>
+				widget in any size. Touch and hold it, tap <span class="font-medium">Edit Widget</span>, and
+				pick the script. You can change the size later; the script adapts.
 			</li>
 		</ol>
 
