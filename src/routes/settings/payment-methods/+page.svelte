@@ -9,9 +9,11 @@
 	on the calendar; only the day of the month is kept and it repeats every month.
 -->
 <script lang="ts">
+	import Bell from '@lucide/svelte/icons/bell';
 	import Check from '@lucide/svelte/icons/check';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Plus from '@lucide/svelte/icons/plus';
-	import { Dialog, Switch } from 'bits-ui';
+	import { Dialog, Select, Switch } from 'bits-ui';
 	import { toast } from 'svelte-sonner';
 	import { enhance } from '$app/forms';
 	import DatePicker from '#lib/components/DatePicker.svelte';
@@ -86,6 +88,7 @@
 	let limit = $state('');
 	let closing = $state<PlainDate | null>(null);
 	let due = $state<PlainDate | null>(null);
+	let remindHour = $state('12');
 	let submitted = $state(false);
 	let pending = $state(false);
 	let serverErrors = $state<PaymentMethodErrors>({});
@@ -100,7 +103,8 @@
 			last4,
 			limit,
 			closingDay: closing ? String(closing.day) : '',
-			dueDay: due ? String(due.day) : ''
+			dueDay: due ? String(due.day) : '',
+			remindHour
 		})
 	);
 	const errors = $derived<PaymentMethodErrors>(
@@ -125,6 +129,7 @@
 		kind = 'credit';
 		name = last4 = limit = '';
 		closing = due = null;
+		remindHour = '12';
 		open = true;
 	}
 
@@ -138,8 +143,17 @@
 		limit = m.limitCents === null ? '' : String(m.limitCents / 100);
 		closing = m.closingDay ? nextOnDay(today, m.closingDay) : null;
 		due = m.dueDay ? nextOnDay(today, m.dueDay) : null;
+		remindHour = String(Math.floor(m.remindAtMinutes / 60));
 		open = true;
 	}
+
+	// Same hours as recurring reminders: on the hour, noon by default.
+	function hourLabel(h: number): string {
+		if (h === 0) return '12 AM (midnight)';
+		if (h === 12) return '12 PM (noon)';
+		return `${h % 12} ${h < 12 ? 'AM' : 'PM'}`;
+	}
+	const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: hourLabel(h) }));
 
 	function repeatsText(d: PlainDate): string {
 		return `Every month on the ${ordinal(d.day)}${d.day > 28 ? ' (or the month’s last day)' : ''}.`;
@@ -460,6 +474,47 @@
 								{/if}
 							</div>
 						{/each}
+
+						{#if due}
+							<div class="flex flex-col gap-1">
+								<span id="pm-remind-label" class={fieldLabel}>Remind me at</span>
+								<Select.Root type="single" name="remindHour" bind:value={remindHour} items={HOURS}>
+									<Select.Trigger
+										data-no-press
+										class="{input} flex items-center gap-2 border px-3 py-2 text-left"
+										aria-labelledby="pm-remind-label"
+									>
+										<Bell class="size-4 shrink-0 text-gray-500" aria-hidden="true" />
+										<span>{hourLabel(Number(remindHour))}</span>
+										<ChevronDown class="ml-auto size-4 shrink-0 text-gray-500" aria-hidden="true" />
+									</Select.Trigger>
+									<Select.Portal>
+										<Select.Content
+											sideOffset={4}
+											class="z-60 max-h-72 w-(--bits-select-anchor-width) min-w-48 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg outline-none dark:border-gray-700 dark:bg-gray-900"
+										>
+											<Select.Viewport>
+												{#each HOURS as h (h.value)}
+													<Select.Item
+														value={h.value}
+														label={h.label}
+														class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+													>
+														{#snippet children({ selected })}
+															<span>{h.label}</span>
+															{#if selected}<Check class="ml-auto size-4" aria-hidden="true" />{/if}
+														{/snippet}
+													</Select.Item>
+												{/each}
+											</Select.Viewport>
+										</Select.Content>
+									</Select.Portal>
+								</Select.Root>
+								<p class={hint}>
+									The day before and the day it’s due, on devices with notifications on.
+								</p>
+							</div>
+						{/if}
 					</div>
 				{/if}
 

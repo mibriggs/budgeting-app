@@ -409,3 +409,26 @@ export const paymentMethod = sqliteTable(
 		check('payment_method_remind_at_valid', sql`${t.remindAtMinutes} BETWEEN 0 AND 1439`)
 	]
 );
+
+/**
+ * Credit card due-date reminders already sent: one row per card, due date and kind. Claimed
+ * before sending (like `reminder_sent` for recurring), so each goes out once however often or
+ * late the tick runs.
+ */
+export const cardReminderSent = sqliteTable(
+	'card_reminder_sent',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		paymentMethodId: text('payment_method_id')
+			.notNull()
+			.references(() => paymentMethod.id, { onDelete: 'cascade' }),
+		dueDate: plainDate('due_date').notNull(),
+		kind: text('kind', { enum: ['day-before', 'day-of'] }).notNull(),
+		...timestamps
+	},
+	(t) => [
+		unique('card_reminder_sent_once').on(t.paymentMethodId, t.dueDate, t.kind),
+		check('card_reminder_sent_date_valid', isCalendarDate(t.dueDate)),
+		check('card_reminder_sent_kind_valid', sql`${t.kind} IN ('day-before', 'day-of')`)
+	]
+);

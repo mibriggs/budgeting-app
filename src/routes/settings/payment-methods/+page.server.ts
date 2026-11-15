@@ -56,7 +56,8 @@ export const actions: Actions = {
 			last4: field('last4'),
 			limit: field('limit'),
 			closingDay: field('closingDay'),
-			dueDay: field('dueDay')
+			dueDay: field('dueDay'),
+			remindHour: field('remindHour')
 		});
 		if ('errors' in parsed) return fail(400, { errors: parsed.errors });
 

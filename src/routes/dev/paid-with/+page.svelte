@@ -167,7 +167,7 @@
 	<section class="flex flex-col gap-2">
 		<h2 class="text-sm font-medium text-gray-500">Phone (expenses tab)</h2>
 		<ul
-			class="w-full max-w-[375px] overflow-hidden rounded-md border border-gray-200 dark:border-gray-800"
+			class="w-full max-w-93.75 overflow-hidden rounded-md border border-gray-200 dark:border-gray-800"
 		>
 			{#each rows as row, i (row.id)}
 				{@const Icon = categoryIcon(row.icon)}
@@ -210,7 +210,7 @@
 						<div class="bg-gray-50 dark:bg-gray-900">
 							<dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-3 pt-2 text-xs">
 								<dt class="text-gray-500">Name</dt>
-								<dd class="break-words">{row.name}</dd>
+								<dd class="wrap-break-word">{row.name}</dd>
 								<dt class="text-gray-500">Category</dt>
 								<dd>{row.category}</dd>
 								<dt class="text-gray-500">Paid with</dt>
@@ -248,7 +248,7 @@
 			role="table"
 			aria-label="Expenses"
 		>
-			<div class="min-w-[64rem]">
+			<div class="min-w-5xl">
 				<div
 					role="row"
 					class="grid border-b border-gray-200 bg-gray-50 text-xs dark:border-gray-800 dark:bg-gray-900"

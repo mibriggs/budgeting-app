@@ -12,6 +12,8 @@ export const isAddableKind = (value: unknown): value is AddableKind =>
 	ADDABLE_KINDS.includes(value as AddableKind);
 
 export const PAYMENT_METHOD_NAME_MAX = 40;
+/** Due-date reminders go out at noon unless the card says otherwise. */
+export const DEFAULT_REMIND_AT_MINUTES = 12 * 60;
 
 export const KIND_LABEL: Record<PaymentMethodKind, string> = {
 	credit: 'Credit card',
@@ -37,6 +39,8 @@ export type PaymentMethodInput = {
 	limitCents: number | null;
 	closingDay: number | null;
 	dueDay: number | null;
+	/** When the due-date reminders go out, in minutes after midnight (noon unless set). */
+	remindAtMinutes: number;
 };
 export type PaymentMethodField = 'kind' | 'name' | 'last4' | 'limit' | 'closingDay' | 'dueDay';
 export type PaymentMethodErrors = Partial<Record<PaymentMethodField, string>>;
@@ -58,6 +62,8 @@ export function parsePaymentMethod(raw: {
 	limit: string;
 	closingDay: string;
 	dueDay: string;
+	/** Hour of the day, "0"–"23"; only used for a credit card with a due date. */
+	remindHour?: string;
 }): { value: PaymentMethodInput } | { errors: PaymentMethodErrors } {
 	const errors: PaymentMethodErrors = {};
 	const kind = raw.kind;
@@ -83,6 +89,14 @@ export function parsePaymentMethod(raw: {
 	const dueDay = credit ? parseDay(raw.dueDay.trim()) : null;
 	if (dueDay === undefined) errors.dueDay = 'Pick a date.';
 
+	// Any other value (or none) means the default, noon.
+	const hourText = raw.remindHour?.trim() ?? '';
+	const hour = hourText === '' ? NaN : Number(hourText);
+	const remindAtMinutes =
+		credit && dueDay && Number.isInteger(hour) && hour >= 0 && hour <= 23
+			? hour * 60
+			: DEFAULT_REMIND_AT_MINUTES;
+
 	if (Object.keys(errors).length > 0) return { errors };
 	return {
 		value: {
@@ -91,7 +105,8 @@ export function parsePaymentMethod(raw: {
 			last4: last4 || null,
 			limitCents,
 			closingDay: closingDay ?? null,
-			dueDay: dueDay ?? null
+			dueDay: dueDay ?? null,
+			remindAtMinutes
 		}
 	};
 }

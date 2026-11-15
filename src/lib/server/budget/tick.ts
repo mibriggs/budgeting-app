@@ -1,6 +1,7 @@
 // The scheduled tick (POST /api/cron/recurring, called every few minutes by cron-job.org):
 // creates every user's due recurring charges and sends the day-before and day-of reminders at
-// each item's reminder time, in each user's own time zone.
+// each item's reminder time, in each user's own time zone, plus credit card due-date reminders
+// (card-reminders.ts).
 //
 // Batched from the start: one read covers every user, then one batch write for charges, one
 // insert to claim reminders, a few reads only for users who have a reminder going out, and all
@@ -25,6 +26,7 @@ import {
 	user
 } from '#lib/server/db/schema.ts';
 import { notifyMany, pushConfigured, type PushPayload } from '#lib/server/push.ts';
+import { cardReminderMessages } from './card-reminders.ts';
 import { spendingByCategory } from './dashboard.ts';
 import { listBudgets } from './limits.ts';
 import { planCharges } from './recurring.ts';
@@ -41,27 +43,7 @@ export type TickResult = {
 
 export async function runTick(now: Temporal.Instant = Temporal.Now.instant()): Promise<TickResult> {
 	// 1. One read: every active cadence, with its item, owner's time zone and category name.
-	const rows = await db
-		.select({
-			scheduleId: recurringSchedule.id,
-			userId: recurringExpense.userId,
-			categoryId: recurringExpense.categoryId,
-			categoryName: expenseCategory.name,
-			name: recurringExpense.name,
-			amountCents: recurringExpense.amountCents,
-			startDate: recurringSchedule.startDate,
-			count: recurringSchedule.intervalCount,
-			unit: recurringSchedule.intervalUnit,
-			endDate: recurringExpense.endDate,
-			generatedThrough: recurringSchedule.generatedThrough,
-			remindAtMinutes: recurringExpense.remindAtMinutes,
-			timezone: user.timezone
-		})
-		.from(recurringSchedule)
-		.innerJoin(recurringExpense, eq(recurringSchedule.recurringExpenseId, recurringExpense.id))
-		.innerJoin(user, eq(user.id, recurringExpense.userId))
-		.innerJoin(expenseCategory, eq(expenseCategory.id, recurringExpense.categoryId))
-		.where(isNull(recurringExpense.pausedAt));
+	const rows = await readRows();
 
 	// "Now" in each user's zone (users without one use the server's, like the page loads do).
 	const fallbackZone = Temporal.Now.timeZoneId();
@@ -102,7 +84,26 @@ export async function runTick(now: Temporal.Instant = Temporal.Now.instant()): P
 	};
 	if (!pushConfigured) return result;
 
-	// 3. Reminders whose time has come today: tomorrow's charges (day before), today's (day of).
+	// 3. Reminders due now: recurring charges and credit card payments (card-reminders.ts),
+	// all sent together in parallel.
+	const messages = [
+		...(await recurringMessages(rows, nowFor)),
+		...(await cardReminderMessages(nowFor))
+	];
+	result.reminders = messages.length;
+	if (messages.length === 0) return result;
+	const sent = await notifyMany(messages);
+	return { ...result, ...sent };
+}
+
+type Row = Awaited<ReturnType<typeof readRows>>[number];
+
+/** Claims the recurring reminders due now (day before / day of) and returns their messages. */
+async function recurringMessages(
+	rows: Row[],
+	nowFor: (timezone: string | null) => Temporal.ZonedDateTime
+): Promise<{ userId: string; payload: PushPayload }[]> {
+	// Reminders whose time has come today: tomorrow's charges (day before), today's (day of).
 	const due: { row: (typeof rows)[number]; kind: Kind; date: PlainDate; today: PlainDate }[] = [];
 	for (const row of rows) {
 		const local = nowFor(row.timezone);
@@ -115,9 +116,9 @@ export async function runTick(now: Temporal.Instant = Temporal.Now.instant()): P
 		if (isOccurrence(cadence, today, row.endDate))
 			due.push({ row, kind: 'day-of', date: today, today });
 	}
-	if (due.length === 0) return result;
+	if (due.length === 0) return [];
 
-	// 4. Claim them in one insert; keep only the ones this call claimed.
+	// Claim them in one insert; keep only the ones this call claimed.
 	const claimed = await db
 		.insert(reminderSent)
 		.values(
@@ -133,10 +134,9 @@ export async function runTick(now: Temporal.Instant = Temporal.Now.instant()): P
 		`${scheduleId}|${date.toString()}|${kind}`;
 	const mine = new Set(claimed.map((c) => key(c.scheduleId, c.occurrenceDate, c.kind)));
 	const toSend = due.filter((d) => mine.has(key(d.row.scheduleId, d.date, d.kind)));
-	result.reminders = toSend.length;
-	if (toSend.length === 0) return result;
+	if (toSend.length === 0) return [];
 
-	// 5. Budget left this month, only for users with a day-of reminder (all fetched at once).
+	// Budget left this month, only for users with a day-of reminder (all fetched at once).
 	const budgetUsers = [
 		...new Set(toSend.filter((d) => d.kind === 'day-of').map((d) => d.row.userId))
 	];
@@ -158,8 +158,7 @@ export async function runTick(now: Temporal.Instant = Temporal.Now.instant()): P
 		})
 	);
 
-	// 6. Send everything in parallel.
-	const messages = toSend.map(({ row, kind, date, today }) => ({
+	return toSend.map(({ row, kind, date, today }) => ({
 		userId: row.userId,
 		payload: reminderPayload(
 			row,
@@ -169,8 +168,6 @@ export async function runTick(now: Temporal.Instant = Temporal.Now.instant()): P
 			leftByUser.get(row.userId)?.get(row.categoryId)
 		)
 	}));
-	const sent = await notifyMany(messages);
-	return { ...result, ...sent };
 }
 
 /** The notification for one reminder (wording decided in future-plans, "Reminder wording"). */
@@ -203,10 +200,37 @@ function reminderPayload(
 			: leftCents >= 0
 				? ` · ${formatCentsWhole(leftCents)} left this month`
 				: ` · ${formatCentsWhole(-leftCents)} over budget this month`;
+	const sentence = `${row.name} — ${amount} was added to ${row.categoryName}${budget}`;
 	return {
 		title: 'Recurring expense added',
-		body: `${row.name} — ${amount} was added to ${row.categoryName}${budget}.`,
+		// No second full stop when the category name already ends in one ("Personal & Misc.").
+		body: sentence.endsWith('.') ? sentence : `${sentence}.`,
 		url,
 		tag
 	};
+}
+
+/** Every active cadence, with its item, owner's time zone and category name. */
+function readRows() {
+	return db
+		.select({
+			scheduleId: recurringSchedule.id,
+			userId: recurringExpense.userId,
+			categoryId: recurringExpense.categoryId,
+			categoryName: expenseCategory.name,
+			name: recurringExpense.name,
+			amountCents: recurringExpense.amountCents,
+			startDate: recurringSchedule.startDate,
+			count: recurringSchedule.intervalCount,
+			unit: recurringSchedule.intervalUnit,
+			endDate: recurringExpense.endDate,
+			generatedThrough: recurringSchedule.generatedThrough,
+			remindAtMinutes: recurringExpense.remindAtMinutes,
+			timezone: user.timezone
+		})
+		.from(recurringSchedule)
+		.innerJoin(recurringExpense, eq(recurringSchedule.recurringExpenseId, recurringExpense.id))
+		.innerJoin(user, eq(user.id, recurringExpense.userId))
+		.innerJoin(expenseCategory, eq(expenseCategory.id, recurringExpense.categoryId))
+		.where(isNull(recurringExpense.pausedAt));
 }

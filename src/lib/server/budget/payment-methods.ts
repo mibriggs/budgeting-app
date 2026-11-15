@@ -32,7 +32,8 @@ export async function listPaymentMethods(userId: string) {
 			last4: paymentMethod.last4,
 			limitCents: paymentMethod.limitCents,
 			closingDay: paymentMethod.closingDay,
-			dueDay: paymentMethod.dueDay
+			dueDay: paymentMethod.dueDay,
+			remindAtMinutes: paymentMethod.remindAtMinutes
 		})
 		.from(paymentMethod)
 		.where(and(eq(paymentMethod.userId, userId), isNull(paymentMethod.archivedAt)))
