@@ -94,6 +94,8 @@
 	let serverErrors = $state<PaymentMethodErrors>({});
 	let formError = $state('');
 	let confirmRemove = $state(false);
+	// Recurring expenses using the method being edited (named in the remove warning).
+	const usedBy = $derived(data.methods.find((m) => m.id === editing)?.usedByRecurring ?? []);
 
 	// Checked in the browser with the same rules as the server; shown once Save is pressed.
 	const parsed = $derived(
@@ -327,8 +329,12 @@
 						if (result.type === 'success') {
 							open = false;
 							if (removing) {
+								const cleared = Number(result.data?.cleared ?? 0);
 								toast.success(`Removed ${label}.`, {
-									description: 'Expenses already paid with it keep showing it.'
+									description:
+										cleared > 0
+											? `${cleared} recurring ${cleared === 1 ? 'expense now has' : 'expenses now have'} no payment method.`
+											: 'Expenses already paid with it keep showing it.'
 								});
 							} else {
 								const saved = result.data?.saved as { name: string; created: boolean } | undefined;
@@ -530,6 +536,15 @@
 							Remove <strong>{name.trim() || 'this method'}</strong>? Expenses already paid with it
 							keep showing it, but you won’t be able to pick it any more.
 						</p>
+						{#if usedBy.length > 0}
+							<p class="font-medium text-red-800 dark:text-red-300">
+								{usedBy.length === 1
+									? '1 recurring expense uses it'
+									: `${usedBy.length} recurring expenses use it`}
+								({usedBy.slice(0, 3).join(', ')}{usedBy.length > 3 ? ', …' : ''}). Their future
+								charges will have no payment method; set a new one in Settings → Recurring.
+							</p>
+						{/if}
 						<div class="flex justify-end gap-2">
 							<button
 								type="button"

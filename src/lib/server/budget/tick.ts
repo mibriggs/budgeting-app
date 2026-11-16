@@ -20,6 +20,7 @@ import { db } from '#lib/server/db/index.ts';
 import {
 	expense,
 	expenseCategory,
+	paymentMethod,
 	recurringExpense,
 	recurringSchedule,
 	reminderSent,
@@ -172,7 +173,14 @@ async function recurringMessages(
 
 /** The notification for one reminder (wording decided in future-plans, "Reminder wording"). */
 function reminderPayload(
-	row: { scheduleId: string; name: string; amountCents: number; categoryName: string },
+	row: {
+		scheduleId: string;
+		name: string;
+		amountCents: number;
+		categoryName: string;
+		paymentMethodName: string | null;
+		paymentMethodLast4: string | null;
+	},
 	kind: Kind,
 	date: PlainDate,
 	today: PlainDate,
@@ -200,7 +208,14 @@ function reminderPayload(
 			: leftCents >= 0
 				? ` · ${formatCentsWhole(leftCents)} left this month`
 				: ` · ${formatCentsWhole(-leftCents)} over budget this month`;
-	const sentence = `${row.name} — ${amount} was added to ${row.categoryName}${budget}`;
+	// "Gym — $10.00 on Chase Sapphire ••4821, added to Health · $40 left this month." when it
+	// has a payment method (last 4 only when known); otherwise "Gym — $10.00 was added to …".
+	const method = row.paymentMethodName
+		? row.paymentMethodName + (row.paymentMethodLast4 ? ` ••${row.paymentMethodLast4}` : '')
+		: null;
+	const sentence = method
+		? `${row.name} — ${amount} on ${method}, added to ${row.categoryName}${budget}`
+		: `${row.name} — ${amount} was added to ${row.categoryName}${budget}`;
 	return {
 		title: 'Recurring expense added',
 		// No second full stop when the category name already ends in one ("Personal & Misc.").
@@ -226,11 +241,16 @@ function readRows() {
 			endDate: recurringExpense.endDate,
 			generatedThrough: recurringSchedule.generatedThrough,
 			remindAtMinutes: recurringExpense.remindAtMinutes,
+			paymentMethodId: recurringExpense.paymentMethodId,
+			// For the day-of reminder ("on Chase Sapphire ••4821"); NULL when none is set.
+			paymentMethodName: paymentMethod.name,
+			paymentMethodLast4: paymentMethod.last4,
 			timezone: user.timezone
 		})
 		.from(recurringSchedule)
 		.innerJoin(recurringExpense, eq(recurringSchedule.recurringExpenseId, recurringExpense.id))
 		.innerJoin(user, eq(user.id, recurringExpense.userId))
 		.innerJoin(expenseCategory, eq(expenseCategory.id, recurringExpense.categoryId))
+		.leftJoin(paymentMethod, eq(paymentMethod.id, recurringExpense.paymentMethodId))
 		.where(isNull(recurringExpense.pausedAt));
 }

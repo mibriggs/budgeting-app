@@ -15,10 +15,13 @@ import { db } from '#lib/server/db/index.ts';
 import {
 	expense,
 	expenseCategory,
+	paymentMethod,
 	recurringExpense,
 	recurringSchedule
 } from '#lib/server/db/schema.ts';
+import type { PaymentMethodKind } from '#lib/payment-methods.ts';
 import { isActiveCategory } from './categories.ts';
+import { isActivePaymentMethod } from './payment-methods.ts';
 
 // ---------------------------------------------------------------------------
 // Listing
@@ -38,6 +41,11 @@ export async function listRecurring(userId: string) {
 			endDate: recurringExpense.endDate,
 			pausedAt: recurringExpense.pausedAt,
 			remindAtMinutes: recurringExpense.remindAtMinutes,
+			paymentMethodId: recurringExpense.paymentMethodId,
+			paymentMethodKind: paymentMethod.kind,
+			paymentMethodName: paymentMethod.name,
+			paymentMethodLast4: paymentMethod.last4,
+			paymentMethodArchived: paymentMethod.archivedAt,
 			scheduleId: recurringSchedule.id,
 			startDate: recurringSchedule.startDate,
 			count: recurringSchedule.intervalCount,
@@ -46,6 +54,7 @@ export async function listRecurring(userId: string) {
 		.from(recurringExpense)
 		.innerJoin(expenseCategory, eq(recurringExpense.categoryId, expenseCategory.id))
 		.innerJoin(recurringSchedule, eq(recurringSchedule.recurringExpenseId, recurringExpense.id))
+		.leftJoin(paymentMethod, eq(recurringExpense.paymentMethodId, paymentMethod.id))
 		.where(eq(recurringExpense.userId, userId))
 		.orderBy(asc(recurringExpense.name), asc(recurringSchedule.startDate));
 
@@ -67,6 +76,16 @@ export async function listRecurring(userId: string) {
 				endDate: r.endDate,
 				paused: r.pausedAt !== null,
 				remindAtMinutes: r.remindAtMinutes,
+				paymentMethod:
+					r.paymentMethodId && r.paymentMethodKind && r.paymentMethodName
+						? {
+								id: r.paymentMethodId,
+								kind: r.paymentMethodKind,
+								name: r.paymentMethodName,
+								last4: r.paymentMethodLast4,
+								archived: r.paymentMethodArchived !== null
+							}
+						: null,
 				cadences: []
 			};
 			items.set(r.id, item);
@@ -85,6 +104,14 @@ export type RecurringItem = {
 	endDate: PlainDate | null;
 	paused: boolean;
 	remindAtMinutes: number;
+	/** What its charges are paid with. `archived` should never be true (removing clears it). */
+	paymentMethod: {
+		id: string;
+		kind: PaymentMethodKind;
+		name: string;
+		last4: string | null;
+		archived: boolean;
+	} | null;
 	cadences: { id: string; startDate: PlainDate; count: number; unit: IntervalUnit }[];
 };
 
@@ -104,11 +131,14 @@ export async function saveRecurring(
 	userId: string,
 	input: RecurringInput,
 	today: PlainDate
-): Promise<{ id: string } | { error: 'not-found' | 'category' }> {
+): Promise<{ id: string } | { error: 'not-found' | 'category' | 'payment-method' }> {
 	const yesterday = today.subtract({ days: 1 });
 
-	let existing: { categoryId: string; pausedAt: Date | null; cadenceIds: Set<string> } | null =
-		null;
+	let existing: {
+		categoryId: string;
+		pausedAt: Date | null;
+		cadenceIds: Set<string>;
+	} | null = null;
 	if (input.id) {
 		const rows = await db
 			.select({
@@ -135,6 +165,12 @@ export async function saveRecurring(
 		(await isActiveCategory(userId, 'expense', input.categoryId));
 	if (!categoryOk) return { error: 'category' };
 
+	// One of the user's methods that hasn't been removed, or none. (Removing a method clears it
+	// from recurring expenses, so they never keep a removed one; see removePaymentMethod.)
+	const methodOk =
+		input.paymentMethodId === null || (await isActivePaymentMethod(userId, input.paymentMethodId));
+	if (!methodOk) return { error: 'payment-method' };
+
 	const id = input.id ?? crypto.randomUUID();
 	const values = {
 		name: input.name,
@@ -143,6 +179,7 @@ export async function saveRecurring(
 		notes: input.notes,
 		endDate: input.endDate,
 		remindAtMinutes: input.remindAtMinutes,
+		paymentMethodId: input.paymentMethodId,
 		pausedAt: input.paused ? (existing?.pausedAt ?? new Date()) : null
 	};
 	const resuming = existing?.pausedAt != null && !input.paused;
@@ -221,6 +258,7 @@ export type DueRow = {
 	unit: IntervalUnit;
 	endDate: PlainDate | null;
 	generatedThrough: PlainDate | null;
+	paymentMethodId: string | null;
 };
 
 /**
@@ -245,7 +283,8 @@ export function planCharges<R extends DueRow>(rows: R[], todayFor: (row: R) => P
 				amountCents: row.amountCents,
 				purchaseDate: date,
 				recurringScheduleId: row.scheduleId,
-				occurrenceDate: date
+				occurrenceDate: date,
+				paymentMethodId: row.paymentMethodId
 			});
 		progress.push({ scheduleId: row.scheduleId, through: today });
 	}
@@ -269,7 +308,8 @@ export async function generateDueCharges(userId: string, today: PlainDate) {
 			count: recurringSchedule.intervalCount,
 			unit: recurringSchedule.intervalUnit,
 			endDate: recurringExpense.endDate,
-			generatedThrough: recurringSchedule.generatedThrough
+			generatedThrough: recurringSchedule.generatedThrough,
+			paymentMethodId: recurringExpense.paymentMethodId
 		})
 		.from(recurringSchedule)
 		.innerJoin(recurringExpense, eq(recurringSchedule.recurringExpenseId, recurringExpense.id))

@@ -22,6 +22,8 @@ export type RecurringPayload = {
 	paused: boolean;
 	remindAtMinutes: number;
 	notes: string;
+	/** What its charges are paid with; '' = not recorded. */
+	paymentMethodId: string;
 };
 
 /** Checked and converted. */
@@ -35,9 +37,11 @@ export type RecurringInput = {
 	paused: boolean;
 	remindAtMinutes: number;
 	notes: string | null;
+	paymentMethodId: string | null;
 };
 
-export type RecurringField = 'name' | 'amount' | 'category' | 'cadences' | 'end' | 'notes' | 'form';
+export type RecurringField =
+	'name' | 'amount' | 'category' | 'paymentMethod' | 'cadences' | 'end' | 'notes' | 'form';
 export type RecurringErrors = Partial<Record<RecurringField, string>>;
 
 const isString = (v: unknown): v is string => typeof v === 'string';
@@ -132,6 +136,10 @@ export function parseRecurring(
 	if (notes.length > MAX_NOTES_LENGTH)
 		errors.notes = `Keep notes under ${MAX_NOTES_LENGTH} characters.`;
 
+	// Whether it's one of the user's methods is checked on save (saveRecurring).
+	const paymentMethodId =
+		isString(raw.paymentMethodId) && raw.paymentMethodId.trim() ? raw.paymentMethodId.trim() : null;
+
 	if (Object.keys(errors).length > 0) return { errors };
 	return {
 		input: {
@@ -143,7 +151,8 @@ export function parseRecurring(
 			endDate,
 			paused: raw.paused === true,
 			remindAtMinutes: remindAtMinutes as number,
-			notes: notes || null
+			notes: notes || null,
+			paymentMethodId
 		}
 	};
 }

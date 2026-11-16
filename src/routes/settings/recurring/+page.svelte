@@ -17,6 +17,8 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import DatePicker from '#lib/components/DatePicker.svelte';
+	import PaymentMethodIcon from '#lib/components/PaymentMethodIcon.svelte';
+	import { last4Label } from '#lib/payment-methods.ts';
 	import { categoryIcon } from '#lib/category-icons.ts';
 	import { Temporal, type PlainDate } from '#lib/dates.ts';
 	import { formatCents, formatCentsWhole } from '#lib/money.ts';
@@ -107,6 +109,8 @@
 		notes: string;
 		/** Bits Select works with strings, so the hour is kept as one here. */
 		remindHour: string;
+		/** '' = not recorded. */
+		paymentMethodId: string;
 	};
 
 	let open = $state(false);
@@ -132,7 +136,8 @@
 		end: null,
 		paused: false,
 		notes: '',
-		remindHour: String(DEFAULT_REMIND_HOUR)
+		remindHour: String(DEFAULT_REMIND_HOUR),
+		paymentMethodId: ''
 	});
 	let form = $state<Form>(blankForm());
 	// The item being edited, for its category when that category has since been archived.
@@ -164,7 +169,9 @@
 			end: i.endDate,
 			paused: i.paused,
 			notes: i.notes,
-			remindHour: String(Math.floor(i.remindAtMinutes / 60))
+			remindHour: String(Math.floor(i.remindAtMinutes / 60)),
+			// A removed method is never kept (removing one clears it); treat one as not recorded.
+			paymentMethodId: i.paymentMethod && !i.paymentMethod.archived ? i.paymentMethod.id : ''
 		};
 		editing = i;
 		submitted = false;
@@ -178,6 +185,10 @@
 		editing?.category.archived ? [...data.categories, editing.category] : data.categories
 	);
 	const selectedCategory = $derived(categories.find((c) => c.id === form.categoryId));
+
+	// Payment methods to pick from (removed ones are left out).
+	const methods = $derived(data.paymentMethods);
+	const selectedMethod = $derived(methods.find((m) => m.id === form.paymentMethodId));
 
 	// The form as a schedule, when it's complete enough to preview.
 	const cadences = $derived(
@@ -235,7 +246,8 @@
 			endDate: form.hasEnd ? (form.end?.toString() ?? '') : null,
 			paused: form.paused,
 			remindAtMinutes: Number(form.remindHour) * 60,
-			notes: form.notes
+			notes: form.notes,
+			paymentMethodId: form.paymentMethodId
 		} satisfies RecurringPayload)
 	);
 
@@ -318,7 +330,11 @@
 								{[
 									describeSchedule(r.cadences),
 									r.endDate && `until ${short(r.endDate)}`,
-									r.category.name
+									r.category.name,
+									r.paymentMethod &&
+										[r.paymentMethod.name, last4Label(r.paymentMethod.last4)]
+											.filter(Boolean)
+											.join(' ')
 								]
 									.filter(Boolean)
 									.join(' · ')}
@@ -515,6 +531,86 @@
 						</Select.Root>
 						{#if show('category')}<p class={errorText}>{show('category')}</p>{/if}
 					</div>
+				</div>
+
+				<!-- Copied onto each charge, like "Paid with" when adding an expense. -->
+				<div class="flex flex-col gap-1">
+					<span id="r-paid-label" class={fieldLabel}>
+						Paid with <span class="font-normal text-gray-500">(optional)</span>
+					</span>
+					<Select.Root
+						type="single"
+						bind:value={form.paymentMethodId}
+						items={[
+							{ value: '', label: 'Not recorded' },
+							...methods.map((m) => ({ value: m.id, label: m.name }))
+						]}
+					>
+						<Select.Trigger
+							data-no-press
+							class="{input} flex items-center gap-2 border px-3 py-2 text-left"
+							aria-labelledby="r-paid-label"
+							aria-invalid={show('paymentMethod') ? true : undefined}
+						>
+							{#if selectedMethod}
+								<PaymentMethodIcon
+									kind={selectedMethod.kind}
+									class="size-4 shrink-0 text-gray-500"
+								/>
+								<span class="truncate">{selectedMethod.name}</span>
+								{#if selectedMethod.last4}
+									<span class="shrink-0 text-gray-500 tabular-nums"
+										>{last4Label(selectedMethod.last4)}</span
+									>
+								{/if}
+							{:else}
+								<span class="text-gray-400">Not recorded</span>
+							{/if}
+							<ChevronDown class="ml-auto size-4 shrink-0 text-gray-500" aria-hidden="true" />
+						</Select.Trigger>
+						<Select.Portal>
+							<Select.Content
+								sideOffset={4}
+								class="z-60 max-h-72 w-(--bits-select-anchor-width) min-w-48 overflow-y-auto rounded-md border border-gray-200 bg-white p-1 text-sm shadow-lg outline-none dark:border-gray-700 dark:bg-gray-900"
+							>
+								<Select.Viewport>
+									<Select.Item
+										value=""
+										label="Not recorded"
+										class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+									>
+										{#snippet children({ selected })}
+											<span class="text-gray-500">Not recorded</span>
+											{#if selected}<Check class="ml-auto size-4" aria-hidden="true" />{/if}
+										{/snippet}
+									</Select.Item>
+									{#each methods as m (m.id)}
+										<Select.Item
+											value={m.id}
+											label={m.name}
+											class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 data-highlighted:bg-gray-100 dark:data-highlighted:bg-gray-800"
+										>
+											{#snippet children({ selected })}
+												<PaymentMethodIcon kind={m.kind} class="size-4 shrink-0 text-gray-500" />
+												<span class="truncate">{m.name}</span>
+												{#if m.last4}
+													<span class="shrink-0 text-xs text-gray-500 tabular-nums"
+														>{last4Label(m.last4)}</span
+													>
+												{/if}
+												{#if selected}<Check class="ml-auto size-4" aria-hidden="true" />{/if}
+											{/snippet}
+										</Select.Item>
+									{/each}
+								</Select.Viewport>
+							</Select.Content>
+						</Select.Portal>
+					</Select.Root>
+					{#if show('paymentMethod')}
+						<p class={errorText}>{show('paymentMethod')}</p>
+					{:else}
+						<p class="text-xs text-gray-500 dark:text-gray-400">Added to each charge.</p>
+					{/if}
 				</div>
 
 				<!-- Schedule: one or more cadences -->

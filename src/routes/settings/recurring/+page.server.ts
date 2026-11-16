@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { today } from '#lib/dates.ts';
 import { parseRecurring, RECURRING_FIELD, type RecurringErrors } from '#lib/recurring-input.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
+import { listPaymentMethods } from '#lib/server/budget/payment-methods.ts';
 import {
 	deleteRecurring,
 	generateDueCharges,
@@ -16,11 +17,17 @@ export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) redirect(302, '/login');
 	const todayForUser = today(locals.user.timezone ?? undefined);
 	await generateDueCharges(locals.user.id, todayForUser);
-	const [items, categories] = await Promise.all([
+	const [items, categories, methods] = await Promise.all([
 		listRecurring(locals.user.id),
-		listActiveCategories(locals.user.id, 'expense')
+		listActiveCategories(locals.user.id, 'expense'),
+		listPaymentMethods(locals.user.id)
 	]);
-	return { today: todayForUser, items, categories };
+	return {
+		today: todayForUser,
+		items,
+		categories,
+		paymentMethods: methods.map(({ id, kind, name, last4 }) => ({ id, kind, name, last4 }))
+	};
 };
 
 export const actions: Actions = {
@@ -36,7 +43,9 @@ export const actions: Actions = {
 			const errors: RecurringErrors =
 				result.error === 'category'
 					? { category: 'Pick a category from the list.' }
-					: { form: 'This recurring expense no longer exists. Reload the page.' };
+					: result.error === 'payment-method'
+						? { paymentMethod: 'That payment method was removed. Pick another.' }
+						: { form: 'This recurring expense no longer exists. Reload the page.' };
 			return fail(400, { errors });
 		}
 		// A charge due today (e.g. a new item starting today) is added right away.

@@ -5,7 +5,7 @@ import { and, asc, between, desc, eq, inArray, isNotNull, isNull, sql, sum } fro
 import { Temporal, type PlainDate } from '#lib/dates.ts';
 import { cardCycle, nextOnDay, type PaymentMethodInput } from '#lib/payment-methods.ts';
 import { db } from '#lib/server/db/index.ts';
-import { expense, paymentMethod } from '#lib/server/db/schema.ts';
+import { expense, paymentMethod, recurringExpense } from '#lib/server/db/schema.ts';
 
 /** Most methods one user can have (not counting removed ones). */
 export const MAX_PAYMENT_METHODS = 30;
@@ -127,22 +127,51 @@ export async function savePaymentMethod(
 
 /**
  * Removes a method (not Cash). Expenses already paid with it keep showing it, so it's archived
- * rather than deleted. Returns false if it isn't the user's or is already gone.
+ * rather than deleted. Recurring expenses that used it go back to "not recorded", so their
+ * future charges don't keep landing on a removed card. Both happen together (one batch).
+ * Returns null if it isn't the user's or is already gone, else how many recurring expenses
+ * were changed.
  */
 export async function removePaymentMethod(userId: string, id: string) {
-	const rows = await db
-		.update(paymentMethod)
-		.set({ archivedAt: new Date() })
-		.where(
-			and(
-				eq(paymentMethod.id, id),
-				eq(paymentMethod.userId, userId),
-				isNull(paymentMethod.archivedAt),
-				sql`${paymentMethod.kind} <> 'cash'`
+	const [archived, cleared] = await db.batch([
+		db
+			.update(paymentMethod)
+			.set({ archivedAt: new Date() })
+			.where(
+				and(
+					eq(paymentMethod.id, id),
+					eq(paymentMethod.userId, userId),
+					isNull(paymentMethod.archivedAt),
+					sql`${paymentMethod.kind} <> 'cash'`
+				)
 			)
-		)
-		.returning({ id: paymentMethod.id });
-	return rows.length > 0;
+			.returning({ id: paymentMethod.id }),
+		// Runs after the archive above: only clears when that method is now removed.
+		db
+			.update(recurringExpense)
+			.set({ paymentMethodId: null })
+			.where(
+				and(
+					eq(recurringExpense.userId, userId),
+					eq(recurringExpense.paymentMethodId, id),
+					sql`exists (select 1 from ${paymentMethod} where ${paymentMethod.id} = ${id} and ${paymentMethod.archivedAt} is not null)`
+				)
+			)
+			.returning({ id: recurringExpense.id })
+	]);
+	return archived.length > 0 ? { cleared: cleared.length } : null;
+}
+
+/** For each of the user's payment methods, the names of the recurring expenses that use it. */
+export async function recurringByPaymentMethod(userId: string) {
+	const rows = await db
+		.select({ methodId: recurringExpense.paymentMethodId, name: recurringExpense.name })
+		.from(recurringExpense)
+		.where(and(eq(recurringExpense.userId, userId), isNotNull(recurringExpense.paymentMethodId)))
+		.orderBy(asc(recurringExpense.name));
+	const byMethod = new Map<string, string[]>();
+	for (const r of rows) byMethod.set(r.methodId!, [...(byMethod.get(r.methodId!) ?? []), r.name]);
+	return byMethod;
 }
 
 /**

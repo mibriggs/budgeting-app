@@ -4,6 +4,7 @@ import { parsePaymentMethod } from '#lib/payment-methods.ts';
 import {
 	creditCardSummaries,
 	listPaymentMethods,
+	recurringByPaymentMethod,
 	removePaymentMethod,
 	savePaymentMethod,
 	spendingByPaymentMethod
@@ -23,9 +24,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	// Same as the other pages that show spending: add any recurring charge that's due first.
 	await generateDueCharges(userId, todayForUser);
-	const [methods, spent] = await Promise.all([
+	const [methods, spent, recurring] = await Promise.all([
 		listPaymentMethods(userId),
-		spendingByPaymentMethod(userId, start, end)
+		spendingByPaymentMethod(userId, start, end),
+		recurringByPaymentMethod(userId)
 	]);
 	const cards = new Map(
 		(await creditCardSummaries(userId, todayForUser, methods)).map((c) => [c.id, c])
@@ -36,6 +38,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		methods: methods.map((m) => ({
 			...m,
 			spentCents: spent.get(m.id) ?? 0,
+			// Recurring expenses whose charges use it (named in the remove warning).
+			usedByRecurring: recurring.get(m.id) ?? [],
 			card: cards.get(m.id) ?? null
 		}))
 	};
@@ -67,12 +71,15 @@ export const actions: Actions = {
 		return { saved: { name: parsed.value.name, created: !id } };
 	},
 
-	/** Removes a method (not Cash). Expenses already paid with it keep showing it. */
+	/**
+	 * Removes a method (not Cash). Expenses already paid with it keep showing it; recurring
+	 * expenses that used it go back to "not recorded" (`cleared` says how many).
+	 */
 	remove: async ({ locals, request }) => {
 		if (!locals.user) error(401, 'Not signed in');
 		const id = (await request.formData()).get('id');
-		if (typeof id !== 'string' || !(await removePaymentMethod(locals.user.id, id)))
-			return fail(404, { error: 'That payment method was already removed.' });
-		return { removed: true };
+		const result = typeof id === 'string' ? await removePaymentMethod(locals.user.id, id) : null;
+		if (!result) return fail(404, { error: 'That payment method was already removed.' });
+		return { removed: true, cleared: result.cleared };
 	}
 };

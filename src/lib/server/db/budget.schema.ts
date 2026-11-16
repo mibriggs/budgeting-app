@@ -221,6 +221,11 @@ export const recurringExpense = sqliteTable(
 		pausedAt: integer('paused_at', { mode: 'timestamp_ms' }),
 		/** When reminders go out, in minutes after midnight in the user's time zone (720 = noon). */
 		remindAtMinutes: integer('remind_at_minutes').notNull().default(720),
+		// What its charges are paid with (copied onto each one); NULL = not recorded. Single-column
+		// FK, ownership checked in code, like the expense link.
+		paymentMethodId: text('payment_method_id').references(() => paymentMethod.id, {
+			onDelete: 'set null'
+		}),
 		...timestamps
 	},
 	(t) => [
