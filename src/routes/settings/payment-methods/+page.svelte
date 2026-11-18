@@ -374,6 +374,7 @@
 					<label for="pm-name" class={fieldLabel}>Name</label>
 					<input
 						id="pm-name"
+						autocapitalize="words"
 						name="name"
 						bind:value={name}
 						maxlength={PAYMENT_METHOD_NAME_MAX}

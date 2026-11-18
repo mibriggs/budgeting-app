@@ -78,7 +78,7 @@
 		toast.success(`Deleted ${count} ${count === 1 ? one : many}.`);
 	}
 
-	// Adding: one dialog, starting on whichever tab's button was pressed (its switch can change it).
+	// Adding: one dialog, for whichever type's button was pressed (no switch here).
 	let addKind = $state<TransactionKind>('expense');
 	let addOpen = $state(false);
 
@@ -356,7 +356,6 @@
 	bind:kind={addKind}
 	categories={data.categories}
 	paymentMethods={data.paymentMethods}
-	lastPaidWith={data.lastPaidWith}
 	today={data.today}
 	{onCreated}
 />

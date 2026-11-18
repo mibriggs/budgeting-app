@@ -197,7 +197,7 @@ function reminderPayload(
 	const tag = `recurring-${row.scheduleId}-${date.toString()}`;
 	if (kind === 'day-before')
 		return {
-			title: 'Recurring expense tomorrow',
+			title: 'Upcoming Expense',
 			body: `${row.name} — ${amount} will be added tomorrow.`,
 			url,
 			tag
@@ -217,7 +217,7 @@ function reminderPayload(
 		? `${row.name} — ${amount} on ${method}, added to ${row.categoryName}${budget}`
 		: `${row.name} — ${amount} was added to ${row.categoryName}${budget}`;
 	return {
-		title: 'Recurring expense added',
+		title: 'Expense Added',
 		// No second full stop when the category name already ends in one ("Personal & Misc.").
 		body: sentence.endsWith('.') ? sentence : `${sentence}.`,
 		url,

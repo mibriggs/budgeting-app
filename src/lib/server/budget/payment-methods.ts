@@ -1,7 +1,7 @@
 // Payment methods (Settings → Payment methods) and the "Paid with" link on expenses.
 // Every user has one built-in Cash, made the first time their methods are read.
 
-import { and, asc, between, desc, eq, inArray, isNotNull, isNull, sql, sum } from 'drizzle-orm';
+import { and, asc, between, eq, inArray, isNotNull, isNull, sql, sum } from 'drizzle-orm';
 import { Temporal, type PlainDate } from '#lib/dates.ts';
 import { cardCycle, nextOnDay, type PaymentMethodInput } from '#lib/payment-methods.ts';
 import { db } from '#lib/server/db/index.ts';
@@ -56,18 +56,6 @@ export async function spendingByPaymentMethod(userId: string, from: PlainDate, t
 		)
 		.groupBy(expense.paymentMethodId);
 	return new Map(rows.map((r) => [r.id as string, r.cents]));
-}
-
-/** The method on the user's most recently added expense, if it can still be picked. */
-export async function lastUsedPaymentMethodId(userId: string): Promise<string | null> {
-	const [row] = await db
-		.select({ id: paymentMethod.id })
-		.from(expense)
-		.innerJoin(paymentMethod, eq(expense.paymentMethodId, paymentMethod.id))
-		.where(and(eq(expense.userId, userId), isNull(paymentMethod.archivedAt)))
-		.orderBy(desc(expense.createdAt))
-		.limit(1);
-	return row?.id ?? null;
 }
 
 /** True if the method belongs to the user and hasn't been removed. */

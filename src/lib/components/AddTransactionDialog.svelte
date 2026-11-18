@@ -2,7 +2,9 @@
 	@component
 	Dialog for adding one expense or income entry: type (Expense | Income), name, amount, date,
 	category, what it was paid with (expenses only, optional) and notes. The page picks the
-	starting type; the switch at the top changes it. Submits to the transactions page's `create`
+	type. With `chooseKind` (the home page's one Add button) a switch at the top can change it;
+	otherwise (the transactions page's Add expense / Add income) the form is for that type only.
+	Every field, dropdowns included, starts empty each time it opens. Submits to the transactions page's `create`
 	action (src/routes/transactions/+page.server.ts), which validates everything and returns
 	per-field errors; the current page's data reloads after a successful add. Used on the
 	transactions page and the home page.
@@ -38,14 +40,14 @@
 		today,
 		action: actionOverride,
 		paymentMethods: activeMethods = [],
-		lastPaidWith = null,
+		chooseKind = false,
 		editing = null,
 		onCreated,
 		onSaved,
 		onDeleted
 	}: {
 		open?: boolean;
-		/** Which type the form starts on; the switch in the dialog updates it. */
+		/** Which type the form is for; the switch (with `chooseKind`) updates it. */
 		kind: TransactionKind;
 		/**
 		 * Where the form posts. Defaults to this page's `?/create` (the transactions page). Other
@@ -56,8 +58,8 @@
 		categories: Record<TransactionKind, CategoryOption[]>;
 		/** Choices for "Paid with" on expenses (removed ones already left out). */
 		paymentMethods?: PaymentMethodOption[];
-		/** The method on the most recent expense; "Paid with" starts on it. */
-		lastPaidWith?: string | null;
+		/** Show the Expense | Income switch (adding only). Off: the form is for `kind` only. */
+		chooseKind?: boolean;
 		/** Default date: today in the user's time zone. */
 		today: PlainDate;
 		onCreated: (created: { kind: TransactionKind; name: string; date: PlainDate }) => void;
@@ -82,12 +84,6 @@
 	let formError = $state('');
 	let pending = $state(false);
 	let confirmDelete = $state(false);
-
-	// Remember the last category used for each kind during this visit; it's often the same.
-	const lastCategory: Partial<Record<TransactionKind, string>> = {};
-	// Starts on the method from the latest expense; updated as expenses are added on this visit.
-	// svelte-ignore state_referenced_locally
-	let lastMethod = lastPaidWith;
 
 	// When editing, the row's own category and payment method stay pickable even if archived.
 	let categories = $derived.by(() => {
@@ -152,8 +148,7 @@
 	function setKind(next: TransactionKind) {
 		if (next === kind) return;
 		kind = next;
-		const last = lastCategory[next];
-		categoryId = last && allCategories[next].some((c) => c.id === last) ? last : '';
+		categoryId = '';
 		errors = { ...errors, categoryId: undefined };
 	}
 
@@ -176,10 +171,8 @@
 		errors = {};
 		formError = '';
 		date = today;
-		const last = lastCategory[kind];
-		categoryId = last && categories.some((c) => c.id === last) ? last : '';
-		paymentMethodId =
-			lastMethod && paymentMethods.some((m) => m.id === lastMethod) ? lastMethod : '';
+		categoryId = '';
+		paymentMethodId = '';
 	}
 
 	// Dates run 1940 to next year (so a payment due in early January can be entered).
@@ -238,8 +231,6 @@
 							onSaved?.({ kind, name: name.trim(), date: date ?? today });
 							await update({ reset: false });
 						} else if (result.type === 'success') {
-							lastCategory[kind] = categoryId;
-							if (kind === 'expense') lastMethod = paymentMethodId;
 							open = false;
 							onCreated({
 								kind,
@@ -266,6 +257,8 @@
 				{#if editing}
 					<input type="hidden" name="kind" value={kind} />
 					<input type="hidden" name="id" value={editing.id} />
+				{:else if !chooseKind}
+					<input type="hidden" name="kind" value={kind} />
 				{:else}
 					<!-- Type: a two-option radio group styled as a segmented switch. -->
 					<fieldset
@@ -294,6 +287,7 @@
 					<label for="add-name" class={fieldLabel}>Name</label>
 					<input
 						id="add-name"
+						autocapitalize="words"
 						name="name"
 						bind:value={name}
 						required

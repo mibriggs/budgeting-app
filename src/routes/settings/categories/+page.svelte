@@ -552,6 +552,7 @@
 							<div class="flex min-w-0 flex-1 flex-col">
 								<input
 									id="name-{row.id}"
+									autocapitalize="words"
 									bind:value={row.name}
 									oninput={() => {
 										delete serverErrors[row.id];

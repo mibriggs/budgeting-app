@@ -2,11 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import { summarizeBudgets } from '#lib/budget-status.ts';
 import { today } from '#lib/dates.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
-import {
-	creditCardSummaries,
-	lastUsedPaymentMethodId,
-	listPaymentMethods
-} from '#lib/server/budget/payment-methods.ts';
+import { creditCardSummaries, listPaymentMethods } from '#lib/server/budget/payment-methods.ts';
 import { generateDueCharges } from '#lib/server/budget/recurring.ts';
 import {
 	dailySpending,
@@ -43,7 +39,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		expenseCategories,
 		incomeCategories,
 		paymentMethods,
-		lastPaidWith,
 		months,
 		byCategory,
 		thisDaily,
@@ -54,7 +49,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listActiveCategories(userId, 'expense'),
 		listActiveCategories(userId, 'income'),
 		listPaymentMethods(userId),
-		lastUsedPaymentMethodId(userId),
 		// For the charts.
 		monthlyTotals(userId, trendStart, thisEnd),
 		spendingByCategory(userId, thisStart, thisEnd),
@@ -82,7 +76,6 @@ export const load: PageServerLoad = async ({ locals }) => {
 			last4,
 			closingDay
 		})),
-		lastPaidWith,
 		// Home page "Credit cards" card: on unless hidden (saved per account).
 		showCreditCards: locals.user.showCreditCards ?? true,
 		dashboard: {

@@ -144,9 +144,9 @@
 <AddTransactionDialog
 	bind:open={addOpen}
 	bind:kind={addKind}
+	chooseKind
 	categories={data.categories}
 	paymentMethods={data.paymentMethods}
-	lastPaidWith={data.lastPaidWith}
 	today={data.today}
 	action="/transactions?/create"
 	{onCreated}

@@ -133,6 +133,7 @@
 		<div class="flex flex-wrap gap-2">
 			<input
 				id="token-name"
+				autocapitalize="words"
 				name="name"
 				value="iPhone widget"
 				maxlength={TOKEN_NAME_MAX}

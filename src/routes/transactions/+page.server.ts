@@ -2,11 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { today } from '#lib/dates.ts';
 import { resolveRange } from '#lib/date-range.ts';
 import { isActiveCategory, listActiveCategories } from '#lib/server/budget/categories.ts';
-import {
-	isActivePaymentMethod,
-	lastUsedPaymentMethodId,
-	listPaymentMethods
-} from '#lib/server/budget/payment-methods.ts';
+import { isActivePaymentMethod, listPaymentMethods } from '#lib/server/budget/payment-methods.ts';
 import { generateDueCharges } from '#lib/server/budget/recurring.ts';
 import { displayName } from '#lib/server/user.ts';
 import {
@@ -38,14 +34,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	// Add any recurring charges that came due (e.g. rent on the 1st) before reading expenses.
 	await generateDueCharges(userId, todayForUser);
 
-	const [expenses, incomes, expenseCategories, incomeCategories, paymentMethods, lastPaidWith] =
+	const [expenses, incomes, expenseCategories, incomeCategories, paymentMethods] =
 		await Promise.all([
 			listExpenses(userId, range),
 			listIncome(userId, range),
 			listActiveCategories(userId, 'expense'),
 			listActiveCategories(userId, 'income'),
-			listPaymentMethods(userId),
-			lastUsedPaymentMethodId(userId)
+			listPaymentMethods(userId)
 		]);
 
 	return {
@@ -61,8 +56,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			name,
 			last4,
 			closingDay
-		})),
-		lastPaidWith
+		}))
 	};
 };
 

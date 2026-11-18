@@ -100,3 +100,30 @@
 		}
 	}
 }
+
+/* While a dialog is open, the page behind it stays put. Bits UI already locks <body>, but on iOS
+   a drag that starts on the backdrop or runs past the end of the dialog still scrolls the page:
+   lock <html> too, ignore pans on the backdrop (tapping it still closes the dialog), and keep a
+   scroll inside the dialog or a dropdown from carrying on to the page. */
+html:has([data-dialog-overlay], [data-alert-dialog-overlay]) {
+	overflow: hidden;
+}
+[data-dialog-overlay],
+[data-alert-dialog-overlay] {
+	touch-action: none;
+}
+[data-dialog-content],
+[data-alert-dialog-content],
+[data-select-content] {
+	overscroll-behavior: contain;
+}
+
+/* iOS zooms the page in when a field with text under 16px gets focus. On touch screens, text
+   fields use 16px so that never happens. Outside any layer so it beats `text-sm` utilities. */
+@media (pointer: coarse) {
+	input:not([type='checkbox'], [type='radio'], [type='hidden'], [type='range']),
+	textarea,
+	select {
+		font-size: 16px;
+	}
+}

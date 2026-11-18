@@ -448,6 +448,7 @@
 					<label for="r-name" class={fieldLabel}>Name</label>
 					<input
 						id="r-name"
+						autocapitalize="words"
 						bind:value={form.name}
 						maxlength={MAX_NAME_LENGTH}
 						autocomplete="off"
