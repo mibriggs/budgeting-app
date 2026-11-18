@@ -108,8 +108,10 @@
 					<Select.Trigger
 						data-no-press
 						aria-label="Credit card"
-						class="flex max-w-44 items-center gap-1.5 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium hover:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800"
+						class="flex max-w-44 items-center gap-1.5 rounded-md border border-gray-300 px-2 py-1 text-xs font-medium outline-none hover:bg-gray-100 focus-visible:bg-gray-100 dark:border-gray-700 dark:hover:bg-gray-800 dark:focus-visible:bg-gray-800"
 					>
+						<!-- No focus outline: Bits refocuses this button when the list closes, and Safari
+						     draws a ring for that even after a tap. Keyboard focus shows as the hover fill. -->
 						<CreditCard class="size-3.5 shrink-0 text-gray-500" aria-hidden="true" />
 						<span class="truncate">{card.name}</span>
 						<ChevronDown class="size-3.5 shrink-0 text-gray-500" aria-hidden="true" />
