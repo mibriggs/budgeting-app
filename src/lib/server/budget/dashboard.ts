@@ -31,6 +31,15 @@ export async function monthlyTotals(userId: string, from: PlainDate, to: PlainDa
 	};
 }
 
+/** All income between two dates, in cents. */
+export async function totalIncome(userId: string, from: PlainDate, to: PlainDate) {
+	const [row] = await db
+		.select({ cents: cents(income.amountCents) })
+		.from(income)
+		.where(and(eq(income.userId, userId), between(income.receivedDate, from, to)));
+	return row?.cents ?? 0;
+}
+
 /** Spending per expense category between two dates, largest first. */
 export function spendingByCategory(userId: string, from: PlainDate, to: PlainDate) {
 	const total = cents(expense.amountCents);
@@ -58,8 +67,14 @@ export async function dailySpending(userId: string, from: PlainDate, to: PlainDa
 	return new Map(rows.map((row) => [row.day, row.cents]));
 }
 
-export { fillMonths, paceByDay, topCategories, upcomingCharges } from '#lib/dashboard.ts';
-export type { CategorySlice, MonthTotals, PacePoint, UpcomingCharge } from '#lib/dashboard.ts';
+export { cashFlow, fillMonths, paceByDay, topCategories, upcomingCharges } from '#lib/dashboard.ts';
+export type {
+	CashFlow,
+	CategorySlice,
+	MonthTotals,
+	PacePoint,
+	UpcomingCharge
+} from '#lib/dashboard.ts';
 
 /** How many expenses the home page "Recent Expenses" card lists. */
 export const RECENT_LIMIT = 8;

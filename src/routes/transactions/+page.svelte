@@ -18,7 +18,7 @@
 	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
 	import AppHeader from '#lib/components/AppHeader.svelte';
 	import DeleteDialog from './DeleteDialog.svelte';
-	import RangePicker from './RangePicker.svelte';
+	import RangePicker from '#lib/components/RangePicker.svelte';
 	import TransactionList from './TransactionList.svelte';
 	import TransactionGrid from './TransactionGrid.svelte';
 	import type { PageProps } from './$types';

@@ -4,12 +4,22 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { RANGE_PRESETS, type DateRange } from '#lib/date-range.ts';
+	import { RANGE_PRESETS, type DateRange, type RangePreset } from '#lib/date-range.ts';
 	import { updateQuery } from '#lib/url.ts';
 	import { focusCalendarDay } from '#lib/calendar.ts';
 	import { today } from '#lib/dates.ts';
 
-	let { range }: { range: DateRange } = $props();
+	let {
+		range,
+		path = '/transactions',
+		defaultPreset = 'month'
+	}: {
+		range: DateRange;
+		/** The page the links go to. */
+		path?: '/' | '/transactions';
+		/** The preset the page shows with no `range` param, so its link drops the param. */
+		defaultPreset?: RangePreset;
+	} = $props();
 
 	let open = $state(false);
 	let popoverContent = $state<HTMLElement | null>(null);
@@ -23,7 +33,7 @@
 			from: params.from ?? null,
 			to: params.to ?? null
 		});
-		return resolve(`/transactions${query}`);
+		return resolve(`${path}${query}`);
 	}
 
 	function onOpenChange(isOpen: boolean) {
@@ -78,7 +88,7 @@
 <nav aria-label="Date range" class="flex flex-wrap gap-1">
 	{#each RANGE_PRESETS as preset (preset.value)}
 		<a
-			href={rangeHref(preset.value === 'month' ? {} : { range: preset.value })}
+			href={rangeHref(preset.value === defaultPreset ? {} : { range: preset.value })}
 			aria-current={range.preset === preset.value ? 'page' : undefined}
 			data-active={range.preset === preset.value || undefined}
 			class={pill}

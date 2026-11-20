@@ -32,6 +32,108 @@ export function topCategories(rows: CategorySlice[]): CategorySlice[] {
 	return [...top, { name: 'Other', icon: null, cents: rest }];
 }
 
+/** How many categories the cash flow chart names; the rest are folded into "Other". */
+export const FLOW_TOP = 5;
+
+export type FlowNodeKind = 'income' | 'overspent' | 'spending' | 'category' | 'leftOver';
+export type FlowNode = {
+	id: string;
+	name: string;
+	cents: number;
+	kind: FlowNodeKind;
+	color: string;
+};
+export type FlowLink = { source: string; target: string; cents: number };
+export type CashFlow = {
+	incomeCents: number;
+	spendingCents: number;
+	nodes: FlowNode[];
+	links: FlowLink[];
+};
+
+/**
+ * Nodes and links for the "Cash Flow" Sankey: all income as one lump, flowing out to the top
+ * categories, "Other" for the rest, and "Left over" for income that wasn't spent.
+ *
+ * When spending is more than income, the income alone can't cover the outflows, so the gap is
+ * shown as its own source ("Overspent") and both join in a "Spending" node that fans out.
+ */
+export function cashFlow(incomeCents: number, byCategory: CategorySlice[]): CashFlow {
+	const spendingCents = byCategory.reduce((sum, row) => sum + row.cents, 0);
+	// "Other" only when it would hold two or more categories; a single one keeps its name.
+	const named = byCategory.length <= FLOW_TOP + 1 ? byCategory : byCategory.slice(0, FLOW_TOP);
+	const rest = byCategory.slice(named.length).reduce((sum, row) => sum + row.cents, 0);
+
+	const targets: FlowNode[] = named
+		.filter((row) => row.cents > 0)
+		.map((row, i) => ({
+			id: `category:${row.name}`,
+			name: row.name,
+			cents: row.cents,
+			kind: 'category',
+			color: `var(--chart-${i + 1})`
+		}));
+	if (rest > 0)
+		targets.push({
+			id: 'other',
+			name: 'Other',
+			cents: rest,
+			kind: 'category',
+			color: 'var(--chart-other)'
+		});
+
+	const income: FlowNode = {
+		id: 'income',
+		name: 'Income',
+		cents: incomeCents,
+		kind: 'income',
+		color: 'var(--chart-6)'
+	};
+	const leftOver = incomeCents - spendingCents;
+
+	if (leftOver >= 0) {
+		if (leftOver > 0)
+			targets.push({
+				id: 'left-over',
+				name: 'Left over',
+				cents: leftOver,
+				kind: 'leftOver',
+				color: 'var(--chart-6)'
+			});
+		return {
+			incomeCents,
+			spendingCents,
+			nodes: incomeCents > 0 ? [income, ...targets] : [],
+			links: targets.map((t) => ({ source: income.id, target: t.id, cents: t.cents }))
+		};
+	}
+
+	const over: FlowNode = {
+		id: 'overspent',
+		name: 'Overspent',
+		cents: -leftOver,
+		kind: 'overspent',
+		color: 'var(--color-red-500)'
+	};
+	const spending: FlowNode = {
+		id: 'spending',
+		name: 'Spending',
+		cents: spendingCents,
+		kind: 'spending',
+		color: 'var(--chart-other)'
+	};
+	const sources = incomeCents > 0 ? [income, over] : [over];
+	return {
+		incomeCents,
+		spendingCents,
+		nodes: [...sources, spending, ...targets],
+		links: [
+			...sources.map((s) => ({ source: s.id, target: spending.id, cents: s.cents })),
+			...targets.map((t) => ({ source: spending.id, target: t.id, cents: t.cents }))
+		]
+	};
+}
+
 /** Every month from `first` to `last` inclusive, with zeros where there was nothing. */
 export function fillMonths(
 	first: Temporal.PlainYearMonth,

@@ -6,6 +6,7 @@
 	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
 	import AppHeader from '#lib/components/AppHeader.svelte';
 	import BudgetCard from '#lib/components/dashboard/BudgetCard.svelte';
+	import CashFlowCard from '#lib/components/dashboard/CashFlowCard.svelte';
 	import CategorySpending from '#lib/components/dashboard/CategorySpending.svelte';
 	import CreditCardsCard from '#lib/components/dashboard/CreditCardsCard.svelte';
 	import MonthlyChart from '#lib/components/dashboard/MonthlyChart.svelte';
@@ -113,7 +114,8 @@
 	<StatTiles tiles={data.dashboard.tiles} />
 
 	<!-- Two rows of two: this month's spending by category and upcoming recurring charges; then
-	     recent expenses and budgets. Then pace and the 6-month trend, each full width. -->
+	     recent expenses and budgets. Then credit cards, cash flow, pace and the 6-month trend, each
+	     full width. -->
 	<div class="grid gap-4 lg:grid-cols-2">
 		<CategorySpending
 			rows={data.dashboard.byCategory}
@@ -138,6 +140,9 @@
 				</div>
 			</div>
 		{/if}
+		<div class="lg:col-span-2">
+			<CashFlowCard flow={data.dashboard.flow} range={data.dashboard.flowRange} />
+		</div>
 		<div class="lg:col-span-2">
 			<PaceChart
 				points={data.dashboard.pace}

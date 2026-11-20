@@ -1,10 +1,12 @@
 import { redirect } from '@sveltejs/kit';
 import { summarizeBudgets } from '#lib/budget-status.ts';
+import { resolveRange } from '#lib/date-range.ts';
 import { today } from '#lib/dates.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
 import { creditCardSummaries, listPaymentMethods } from '#lib/server/budget/payment-methods.ts';
 import { generateDueCharges, listRecurring } from '#lib/server/budget/recurring.ts';
 import {
+	cashFlow,
 	dailySpending,
 	fillMonths,
 	monthlyTotals,
@@ -12,6 +14,7 @@ import {
 	recentExpenses,
 	spendingByCategory,
 	topCategories,
+	totalIncome,
 	upcomingCharges
 } from '#lib/server/budget/dashboard.ts';
 import { listBudgets } from '#lib/server/budget/limits.ts';
@@ -21,7 +24,7 @@ import type { PageServerLoad } from './login/$types';
 /** How many months the "income vs expenses" chart covers, including this one. */
 const TREND_MONTHS = 6;
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) {
 		return redirect(302, '/login');
 	}
@@ -33,6 +36,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const lastStart = thisStart.subtract({ months: 1 });
 	const lastEnd = thisStart.subtract({ days: 1 });
 	const trendStart = thisStart.subtract({ months: TREND_MONTHS - 1 });
+	// "Cash Flow" period from ?range= (same values as the transactions page); last 6 months by default.
+	const flowRange = resolveRange(url.searchParams, todayForUser, '6m');
 
 	// Add any recurring charges that came due (e.g. rent on the 1st) before reading expenses.
 	await generateDueCharges(userId, todayForUser);
@@ -47,7 +52,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		lastDaily,
 		limits,
 		recent,
-		recurring
+		recurring,
+		flowIncome,
+		flowByCategory
 	] = await Promise.all([
 		// For the add expense / add income dialogs.
 		listActiveCategories(userId, 'expense'),
@@ -61,7 +68,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		listBudgets(userId, thisStart.toPlainYearMonth()),
 		// For the "Recent Expenses" and "Upcoming Payments" cards.
 		recentExpenses(userId, todayForUser),
-		listRecurring(userId)
+		listRecurring(userId),
+		// For the "Cash Flow" chart.
+		totalIncome(userId, flowRange.from, flowRange.to),
+		spendingByCategory(userId, flowRange.from, flowRange.to)
 	]);
 
 	const cards = await creditCardSummaries(userId, todayForUser, paymentMethods);
@@ -98,6 +108,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			slices: topCategories(byCategory),
 			trend,
 			pace,
+			flow: cashFlow(flowIncome, flowByCategory),
+			flowRange,
 			cards,
 			recent: recent.map((row) => ({ ...row, kind: 'expense' as const })),
 			upcoming: upcomingCharges(recurring, todayForUser),

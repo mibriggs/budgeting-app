@@ -23,14 +23,19 @@ export type DateRange = {
 	error?: string;
 };
 
-export function resolveRange(params: URLSearchParams, today: PlainDate): DateRange {
-	const range = params.get('range') ?? 'month';
+/** `fallback` is the preset used when the URL names none (or something invalid). */
+export function resolveRange(
+	params: URLSearchParams,
+	today: PlainDate,
+	fallback: RangePreset = 'month'
+): DateRange {
+	const range = params.get('range') ?? fallback;
 
 	if (range === 'custom') {
 		const from = parseDate(params.get('from'));
 		const to = parseDate(params.get('to'));
 		if (!from || !to) {
-			return { ...presetRange('month', today), error: 'Pick a valid start and end date.' };
+			return { ...presetRange(fallback, today), error: 'Pick a valid start and end date.' };
 		}
 		// Accept a reversed range rather than showing an error.
 		return Temporal.PlainDate.compare(from, to) <= 0
@@ -39,7 +44,7 @@ export function resolveRange(params: URLSearchParams, today: PlainDate): DateRan
 	}
 
 	const preset = RANGE_PRESETS.find((p) => p.value === range);
-	return preset ? presetRange(preset.value, today) : presetRange('month', today);
+	return presetRange(preset?.value ?? fallback, today);
 }
 
 function presetRange(value: RangePreset, today: PlainDate): DateRange {
