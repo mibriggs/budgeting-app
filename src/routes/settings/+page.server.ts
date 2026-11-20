@@ -1,4 +1,5 @@
 import { redirect } from '@sveltejs/kit';
+import { overallStatus, summarizeBudgets } from '#lib/budget-status.ts';
 import { listTokens } from '#lib/server/api-token.ts';
 import { today } from '#lib/dates.ts';
 import { chargesPerMonth, upcoming } from '#lib/recurring-schedule.ts';
@@ -42,7 +43,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		count: withLimit.length,
 		budgetedCents: withLimit.reduce((sum, b) => sum + (b.limitCents ?? 0), 0),
 		spentCents: withLimit.reduce((sum, b) => sum + (spentById.get(b.id) ?? 0), 0),
-		daysLeft: end.day - todayForUser.day
+		daysLeft: end.day - todayForUser.day,
+		// The bar's colour, by the home page Budgets card's rules (pace for everyday categories,
+		// bills paid in full are fine).
+		status: overallStatus(summarizeBudgets(budgets, spentById, todayForUser))
 	};
 
 	// Recurring: active ones (not paused, not ended), their monthly cost, and the next charge.

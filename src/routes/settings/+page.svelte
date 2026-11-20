@@ -148,7 +148,13 @@
 				<span
 					class={[
 						'block h-full rounded-full',
-						budgetUsed > 1 ? 'bg-red-500' : 'bg-gray-900 dark:bg-gray-100'
+						// Red: over the total. Amber: a category is over, close (80%+) or heading over at
+						// its pace. Grey: on track. See overallStatus in src/lib/budget-status.ts.
+						data.budgets.status === 'over'
+							? 'bg-red-500'
+							: data.budgets.status === 'watch'
+								? 'bg-amber-500'
+								: 'bg-gray-400 dark:bg-gray-500'
 					]}
 					style:width="{Math.min(budgetUsed, 1) * 100}%"
 				></span>

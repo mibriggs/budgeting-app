@@ -104,3 +104,16 @@ export function summarizeBudgets(
 		daysInMonth
 	};
 }
+
+/**
+ * One colour for all budgets together (the Settings → Budgets card's bar), from the same
+ * per-category rules as the home page card:
+ * - over:  total spending is past the total of the limits
+ * - watch: any category is over, close, or heading over (bills paid in full don't count)
+ * - ok:    everything else
+ */
+export function overallStatus(summary: BudgetSummary): 'over' | 'watch' | 'ok' {
+	if (summary.totalSpent > summary.totalLimit) return 'over';
+	if (summary.lines.some((l) => l.status !== 'ok')) return 'watch';
+	return 'ok';
+}
