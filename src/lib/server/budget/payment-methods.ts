@@ -1,4 +1,4 @@
-// Payment methods (Settings → Payment methods) and the "Paid with" link on expenses.
+// Payment methods (Settings → Payment Methods) and the "Paid with" link on expenses.
 // Every user has one built-in Cash, made the first time their methods are read.
 
 import { and, asc, between, eq, inArray, isNotNull, isNull, sql, sum } from 'drizzle-orm';

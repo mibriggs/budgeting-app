@@ -78,7 +78,7 @@
 	</div>
 	<div class="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
 		<dt class="text-xs text-gray-500 dark:text-gray-400">
-			Spent vs. last month <span class="whitespace-nowrap">(by day {tiles.dayOfMonth})</span>
+			Spent vs. Last Month <span class="whitespace-nowrap">(by day {tiles.dayOfMonth})</span>
 		</dt>
 		<dd class="mt-1 flex items-center gap-1 text-xl font-semibold tabular-nums">
 			{#if change === null}

@@ -37,7 +37,7 @@
 		{
 			id: '/settings/payment-methods',
 			href: resolve('/settings/payment-methods'),
-			label: 'Payment methods',
+			label: 'Payment Methods',
 			icon: CreditCard
 		},
 		{

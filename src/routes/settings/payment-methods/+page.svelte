@@ -1,5 +1,5 @@
 <!--
-	Settings → Payment methods: credit cards, debit cards and pay apps (Venmo, Zelle…), plus the
+	Settings → Payment Methods: credit cards, debit cards and pay apps (Venmo, Zelle…), plus the
 	built-in Cash. Each row shows this month's spending through it. A credit card with a closing
 	date shows its current billing cycle instead (and how much of the limit that is), plus the
 	next payment: "$842 due Dec 3" while the last statement is unpaid, else when the next one's due. The add/edit dialog keeps only what's needed to
@@ -37,7 +37,7 @@
 
 	let { data }: PageProps = $props();
 
-	// Home page "Credit cards" card, saved per account as soon as the switch moves.
+	// Home page "Credit Cards" card, saved per account as soon as the switch moves.
 	// svelte-ignore state_referenced_locally
 	let showCreditCards = $state(data.showCreditCards);
 	async function setShowCreditCards(show: boolean) {
@@ -189,7 +189,7 @@
 </script>
 
 <svelte:head>
-	<title>Payment methods · Settings · Budget</title>
+	<title>Payment Methods · Settings · CentJar</title>
 </svelte:head>
 
 {#snippet row(m: Row)}
@@ -225,7 +225,7 @@
 <section aria-labelledby="section-title">
 	<div class="flex flex-wrap items-end justify-between gap-3">
 		<div>
-			<h2 id="section-title" class="text-lg font-semibold">Payment methods</h2>
+			<h2 id="section-title" class="text-lg font-semibold">Payment Methods</h2>
 			<p class="text-sm text-gray-500 dark:text-gray-400">
 				Cards and apps you pay with. Pick one when you add an expense to see what went where.
 			</p>
@@ -254,7 +254,7 @@
 			/>
 		</Switch.Root>
 		<label for="show-credit-cards" class="text-sm">
-			Show “Credit cards” on the home page
+			Show “Credit Cards” on the home page
 			<span class="block text-xs text-gray-500 dark:text-gray-400">
 				Billing cycle, last statement and next payment for each credit card.
 			</span>

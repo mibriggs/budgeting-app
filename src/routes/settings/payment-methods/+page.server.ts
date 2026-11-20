@@ -12,7 +12,7 @@ import {
 import { generateDueCharges } from '#lib/server/budget/recurring.ts';
 import type { Actions, PageServerLoad } from './$types';
 
-// Settings → Payment methods: cards and pay apps an expense can be "Paid with", plus the
+// Settings → Payment Methods: cards and pay apps an expense can be "Paid with", plus the
 // built-in Cash. Each row shows this month's spending through it. Every action works on the
 // signed-in user's own methods only.
 export const load: PageServerLoad = async ({ locals }) => {

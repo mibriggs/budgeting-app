@@ -264,7 +264,7 @@
 </script>
 
 <svelte:head>
-	<title>Recurring · Settings · Budget</title>
+	<title>Recurring · Settings · CentJar</title>
 </svelte:head>
 
 <section aria-labelledby="section-title">

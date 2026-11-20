@@ -26,7 +26,7 @@
 	let latest = $derived(points.findLast((p) => p.thisMonth !== null));
 </script>
 
-<ChartCard title="On pace?" subtitle="Spending so far, by day of the month">
+<ChartCard title="On Pace?" subtitle="Spending so far, by day of the month">
 	{#snippet table()}
 		<table class="w-full text-left tabular-nums">
 			<thead class="text-gray-500 dark:text-gray-400">

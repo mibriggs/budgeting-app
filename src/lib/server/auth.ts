@@ -29,8 +29,8 @@ export const auth = betterAuth({
 			// IANA time zone (e.g. "America/New_York") used for "today" and "this month".
 			// Unset until the app records it from the browser.
 			timezone: { type: 'string', required: false, input: false },
-			// Home page "Credit cards" card: shown unless the user hides it (× on the card, or
-			// Settings → Payment methods). Saved by POST /settings/home-cards.
+			// Home page "Credit Cards" card: shown unless the user hides it (× on the card, or
+			// Settings → Payment Methods). Saved by POST /settings/home-cards.
 			showCreditCards: { type: 'boolean', required: false, defaultValue: true, input: false }
 		}
 	},

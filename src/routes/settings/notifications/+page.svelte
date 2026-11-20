@@ -209,7 +209,7 @@
 </script>
 
 <svelte:head>
-	<title>Notifications · Settings · Budget</title>
+	<title>Notifications · Settings · CentJar</title>
 </svelte:head>
 
 <section aria-labelledby="section-title">
@@ -253,11 +253,11 @@
 							On iPhone and iPad, notifications only work in the app on your Home Screen. In Safari,
 							tap <span class="font-medium text-gray-700 dark:text-gray-300">Share</span>, then
 							<span class="font-medium text-gray-700 dark:text-gray-300">Add to Home Screen</span>,
-							then open Budget from your Home Screen and come back here. (Needs iOS 16.4 or later.)
+							then open CentJar from your Home Screen and come back here. (Needs iOS 16.4 or later.)
 						{:else if status === 'denied'}
 							Notifications are blocked for this site. To allow them: on iPhone, open the
 							<span class="font-medium text-gray-700 dark:text-gray-300">Settings</span> app → Notifications
-							→ Budget; in Chrome or Edge, click the icon at the left of the address bar → Notifications;
+							→ CentJar; in Chrome or Edge, click the icon at the left of the address bar → Notifications;
 							in Safari on Mac, Safari → Settings → Websites → Notifications. Then reload this page.
 						{:else}
 							This browser doesn’t support notifications.

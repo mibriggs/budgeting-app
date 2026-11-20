@@ -1,4 +1,4 @@
-// Showing and hiding the home page "Credit cards" card (saved per account).
+// Showing and hiding the home page "Credit Cards" card (saved per account).
 
 import { toast } from 'svelte-sonner';
 

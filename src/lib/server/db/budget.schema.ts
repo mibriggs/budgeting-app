@@ -141,7 +141,7 @@ export const expense = sqliteTable(
 			onDelete: 'set null'
 		}),
 		occurrenceDate: plainDate('occurrence_date'),
-		// What it was paid with (Settings → Payment methods); NULL = not recorded. Single-column
+		// What it was paid with (Settings → Payment Methods); NULL = not recorded. Single-column
 		// FK, ownership checked in code, for the same reason as the recurring link. Removing a
 		// method archives it (see payment-methods.ts), so this normally stays set.
 		paymentMethodId: text('payment_method_id').references(() => paymentMethod.id, {

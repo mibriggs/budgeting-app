@@ -71,7 +71,7 @@ self.addEventListener('push', (event) => {
 	try {
 		payload = event.data?.json() as PushPayload;
 	} catch {
-		payload = { title: 'Budget', body: event.data?.text() ?? '' };
+		payload = { title: 'CentJar', body: event.data?.text() ?? '' };
 	}
 	event.waitUntil(
 		self.registration.showNotification(payload.title, {
@@ -132,7 +132,7 @@ function offlinePage() {
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<meta name="theme-color" content="#166534" />
-	<title>Offline · Budget</title>
+	<title>Offline · CentJar</title>
 	<style>
 		body { margin: 0; min-height: 100dvh; display: grid; place-items: center; font-family: system-ui, sans-serif; color: #111827; background: #fff; text-align: center; padding: 1.5rem; box-sizing: border-box; }
 		@media (prefers-color-scheme: dark) { body { color: #f3f4f6; background: #030712; } }

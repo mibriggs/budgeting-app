@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+/* App font, self-hosted (bundled by Vite, so the service worker precaches it for offline use).
+   Upright only; the app doesn't use italics. */
+@import '@fontsource-variable/plus-jakarta-sans';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
@@ -11,6 +14,10 @@
    a sidebar. Kept in step with LARGE_SCREEN in src/lib/media.svelte.ts. */
 @theme {
 	--breakpoint-large: 73.75rem;
+	/* Plus Jakarta Sans everywhere; system fonts only while it loads. */
+	--font-sans:
+		'Plus Jakarta Sans Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+		sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 }
 
 @layer base {

@@ -1,5 +1,5 @@
 // Payment methods: rules and helpers shared by the browser and the server (Settings → Payment
-// methods, and "Paid with" on the add-expense form).
+// Methods, and "Paid with" on the add-expense form).
 
 import { Temporal, type PlainDate } from '#lib/dates.ts';
 import { parseAmount } from '#lib/transaction-input.ts';

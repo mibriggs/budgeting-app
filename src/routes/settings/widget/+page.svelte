@@ -75,7 +75,7 @@
 </script>
 
 <svelte:head>
-	<title>Widget · Settings · Budget</title>
+	<title>Widget · Settings · CentJar</title>
 </svelte:head>
 
 <section aria-labelledby="section-title" class="flex flex-col gap-4">

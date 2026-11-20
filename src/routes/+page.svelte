@@ -10,7 +10,9 @@
 	import CreditCardsCard from '#lib/components/dashboard/CreditCardsCard.svelte';
 	import MonthlyChart from '#lib/components/dashboard/MonthlyChart.svelte';
 	import PaceChart from '#lib/components/dashboard/PaceChart.svelte';
+	import RecentExpensesCard from '#lib/components/dashboard/RecentExpensesCard.svelte';
 	import StatTiles from '#lib/components/dashboard/StatTiles.svelte';
+	import UpcomingRecurringCard from '#lib/components/dashboard/UpcomingRecurringCard.svelte';
 	import type { PlainDate, Temporal } from '#lib/dates.ts';
 	import { formatDate, formatMonth, monthRangeParams } from '#lib/date-range.ts';
 	import { updateQuery } from '#lib/url.ts';
@@ -26,7 +28,7 @@
 	const monthName = (month: Temporal.PlainYearMonth) => formatMonth(month, { year: false });
 	let thisMonthLabel = $derived(formatMonth(data.dashboard.month));
 
-	// "Credit cards" card. Hidden right away when the × is pressed (then saved); Undo shows it
+	// "Credit Cards" card. Hidden right away when the × is pressed (then saved); Undo shows it
 	// again. It blurs out, then the space slides shut so the cards below move up smoothly.
 	// svelte-ignore state_referenced_locally
 	let showCreditCards = $state(data.showCreditCards);
@@ -44,8 +46,8 @@
 	async function hideCreditCards() {
 		await setCreditCards(false);
 		if (showCreditCards) return; // Couldn't save; it's back.
-		toast('Credit cards hidden from home.', {
-			description: 'Turn it back on in Settings → Payment methods.',
+		toast('Credit Cards hidden from home.', {
+			description: 'Turn it back on in Settings → Payment Methods.',
 			action: { label: 'Undo', onClick: () => setCreditCards(true) }
 		});
 	}
@@ -93,13 +95,13 @@
 </script>
 
 <svelte:head>
-	<title>Budget</title>
+	<title>CentJar</title>
 </svelte:head>
 
 <AppHeader name={data.displayName} home />
 
 <main class="mx-auto flex max-w-6xl flex-col gap-4 px-4 pt-2 pb-6 sm:px-6">
-	<!-- Quick actions, left-aligned at the top (under "Budget"). -->
+	<!-- Quick actions, left-aligned at the top (under "CentJar"). -->
 	<div class="flex flex-wrap items-center justify-start gap-3">
 		<button type="button" class={primary} onclick={openAdd}>
 			<Plus class="size-4" aria-hidden="true" />
@@ -110,14 +112,20 @@
 
 	<StatTiles tiles={data.dashboard.tiles} />
 
-	<!-- This month: where it went and how budgets stand, side by side; then pace and the 6-month
-	     trend, each full width. -->
+	<!-- Two rows of two: this month's spending by category and upcoming recurring charges; then
+	     recent expenses and budgets. Then pace and the 6-month trend, each full width. -->
 	<div class="grid gap-4 lg:grid-cols-2">
 		<CategorySpending
 			rows={data.dashboard.byCategory}
 			slices={data.dashboard.slices}
 			subtitle={thisMonthLabel}
 		/>
+		<UpcomingRecurringCard
+			charges={data.dashboard.upcoming.charges}
+			nextLater={data.dashboard.upcoming.nextLater}
+			today={data.today}
+		/>
+		<RecentExpensesCard items={data.dashboard.recent} today={data.today} />
 		<BudgetCard summary={data.dashboard.budgets} subtitle={thisMonthLabel} />
 		{#if showCreditCards}
 			<div class="lg:col-span-2" transition:closeGap>

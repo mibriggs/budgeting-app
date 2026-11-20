@@ -2,6 +2,8 @@
 // (server load, the dev preview page, a quick Node check).
 
 import { Temporal, type PlainDate } from '#lib/dates.ts';
+import type { PaymentMethodKind } from '#lib/payment-methods.ts';
+import { describeSchedule, occurrencesFrom, type Cadence } from '#lib/recurring-schedule.ts';
 
 export type CategorySlice = { name: string; icon: string | null; cents: number };
 export type MonthTotals = {
@@ -81,4 +83,75 @@ export function paceByDay(
 		points.push({ day, thisMonth, lastMonth });
 	}
 	return points;
+}
+
+/** How far ahead the home page "Upcoming Payments" card looks. */
+export const UPCOMING_DAYS = 30;
+
+/** One charge a recurring expense will add, for the "Upcoming Payments" card. */
+export type UpcomingCharge = {
+	/** Cadence id plus date (a weekly schedule appears more than once). */
+	id: string;
+	name: string;
+	date: PlainDate;
+	amountCents: number;
+	/** "Monthly on the 1st", from describeSchedule. */
+	schedule: string;
+	categoryName: string;
+	categoryIcon: string | null;
+	paymentMethodKind: PaymentMethodKind | null;
+	paymentMethodName: string | null;
+};
+
+/** The parts of a recurring expense (see listRecurring) the upcoming list needs. */
+type RecurringLike = {
+	name: string;
+	amountCents: number;
+	category: { name: string; icon: string | null };
+	endDate: PlainDate | null;
+	paused: boolean;
+	paymentMethod: { kind: PaymentMethodKind; name: string } | null;
+	cadences: (Cadence & { id: string })[];
+};
+
+/**
+ * Every charge from tomorrow through `days` days ahead, soonest first (same day: bigger first).
+ * Today's charges are left out: they've already been added and show as recent expenses.
+ * Paused items are skipped. `nextLater` is the first charge after the window, so the card can
+ * name it when nothing falls inside.
+ */
+export function upcomingCharges(
+	items: RecurringLike[],
+	today: PlainDate,
+	days = UPCOMING_DAYS
+): { charges: UpcomingCharge[]; nextLater: UpcomingCharge | null } {
+	const from = today.add({ days: 1 });
+	const last = today.add({ days });
+	const charges: UpcomingCharge[] = [];
+	let nextLater: UpcomingCharge | null = null;
+	for (const item of items) {
+		if (item.paused) continue;
+		const base = {
+			name: item.name,
+			amountCents: item.amountCents,
+			schedule: describeSchedule(item.cadences),
+			categoryName: item.category.name,
+			categoryIcon: item.category.icon,
+			paymentMethodKind: item.paymentMethod?.kind ?? null,
+			paymentMethodName: item.paymentMethod?.name ?? null
+		};
+		const until =
+			item.endDate && Temporal.PlainDate.compare(item.endDate, last) < 0 ? item.endDate : last;
+		for (const c of item.cadences) {
+			for (const date of occurrencesFrom(c, from, days, until))
+				charges.push({ ...base, id: `${c.id}:${date}`, date });
+			const [later] = occurrencesFrom(c, last.add({ days: 1 }), 1, item.endDate);
+			if (later && (!nextLater || Temporal.PlainDate.compare(later, nextLater.date) < 0))
+				nextLater = { ...base, id: `${c.id}:${later}`, date: later };
+		}
+	}
+	charges.sort(
+		(a, b) => Temporal.PlainDate.compare(a.date, b.date) || b.amountCents - a.amountCents
+	);
+	return { charges, nextLater: charges.length ? null : nextLater };
 }

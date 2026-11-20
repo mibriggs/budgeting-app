@@ -70,7 +70,7 @@
 </script>
 
 <svelte:head>
-	<title>Settings · Budget</title>
+	<title>Settings · CentJar</title>
 </svelte:head>
 
 {#snippet card(
@@ -248,7 +248,7 @@
 	{@render card('/settings/budgets', 'Budgets', Wallet, true, budgetsBody)}
 	{@render card('/settings/recurring', 'Recurring', Repeat, true, recurringBody)}
 	{@render card('/settings/categories', 'Categories', Tags, false, categoriesBody)}
-	{@render card('/settings/payment-methods', 'Payment methods', CreditCard, false, paymentBody)}
+	{@render card('/settings/payment-methods', 'Payment Methods', CreditCard, false, paymentBody)}
 	{@render card('/settings/notifications', 'Notifications', Bell, false, notificationsBody)}
 	{@render card('/settings/widget', 'Widget', LayoutGrid, false, widgetBody)}
 </div>

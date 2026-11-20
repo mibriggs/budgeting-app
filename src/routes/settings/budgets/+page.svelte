@@ -93,7 +93,7 @@
 </script>
 
 <svelte:head>
-	<title>Budgets · Settings · Budget</title>
+	<title>Budgets · Settings · CentJar</title>
 </svelte:head>
 
 <section aria-labelledby="section-title">

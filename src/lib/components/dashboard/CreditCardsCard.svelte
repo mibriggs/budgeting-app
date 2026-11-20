@@ -1,6 +1,6 @@
 <!--
 	@component
-	Home page "Credit cards" card: one credit card at a time, picked from a dropdown when there's
+	Home page "Credit Cards" card: one credit card at a time, picked from a dropdown when there's
 	more than one (the choice is remembered on this device). For a card with a statement closing
 	date it shows three numbers:
 	- This cycle: spending since the last statement closed, with a bar for the share of the limit
@@ -10,7 +10,7 @@
 	  the current cycle's bill will be due.
 	A card without a closing date shows this month's spending and a link to add the date.
 	Only expenses recorded as "Paid with" the card count; it isn't the bank's balance.
-	With no credit cards yet, it's a short prompt linking to Settings → Payment methods.
+	With no credit cards yet, it's a short prompt linking to Settings → Payment Methods.
 	The × asks the page to hide the card (the page saves that and animates it away).
 -->
 <script lang="ts">
@@ -91,7 +91,7 @@
 </script>
 
 <ChartCard
-	title="Credit cards"
+	title="Credit Cards"
 	subtitle={cards.length === 1 && card
 		? [card.name, last4Label(card.last4)].filter(Boolean).join(' ')
 		: undefined}
@@ -149,7 +149,7 @@
 				type="button"
 				onclick={onHide}
 				class="-mr-1 rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-200"
-				aria-label="Hide Credit cards from home"
+				aria-label="Hide Credit Cards from home"
 				title="Hide from home"
 			>
 				<X class="size-4" aria-hidden="true" />

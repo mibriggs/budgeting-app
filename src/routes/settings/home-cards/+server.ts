@@ -5,9 +5,9 @@ import { user } from '#lib/server/db/schema.ts';
 import type { RequestHandler } from './$types';
 
 /**
- * Shows or hides the home page "Credit cards" card for this account (all devices).
+ * Shows or hides the home page "Credit Cards" card for this account (all devices).
  * Body: `{ "creditCards": true | false }`. Called by the × on the card, its Undo, and the switch
- * in Settings → Payment methods.
+ * in Settings → Payment Methods.
  */
 export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) error(401, 'Not signed in');

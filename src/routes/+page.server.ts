@@ -3,14 +3,16 @@ import { summarizeBudgets } from '#lib/budget-status.ts';
 import { today } from '#lib/dates.ts';
 import { listActiveCategories } from '#lib/server/budget/categories.ts';
 import { creditCardSummaries, listPaymentMethods } from '#lib/server/budget/payment-methods.ts';
-import { generateDueCharges } from '#lib/server/budget/recurring.ts';
+import { generateDueCharges, listRecurring } from '#lib/server/budget/recurring.ts';
 import {
 	dailySpending,
 	fillMonths,
 	monthlyTotals,
 	paceByDay,
+	recentExpenses,
 	spendingByCategory,
-	topCategories
+	topCategories,
+	upcomingCharges
 } from '#lib/server/budget/dashboard.ts';
 import { listBudgets } from '#lib/server/budget/limits.ts';
 import { displayName } from '#lib/server/user.ts';
@@ -43,7 +45,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		byCategory,
 		thisDaily,
 		lastDaily,
-		limits
+		limits,
+		recent,
+		recurring
 	] = await Promise.all([
 		// For the add expense / add income dialogs.
 		listActiveCategories(userId, 'expense'),
@@ -54,7 +58,10 @@ export const load: PageServerLoad = async ({ locals }) => {
 		spendingByCategory(userId, thisStart, thisEnd),
 		dailySpending(userId, thisStart, todayForUser),
 		dailySpending(userId, lastStart, lastEnd),
-		listBudgets(userId, thisStart.toPlainYearMonth())
+		listBudgets(userId, thisStart.toPlainYearMonth()),
+		// For the "Recent Expenses" and "Upcoming Payments" cards.
+		recentExpenses(userId, todayForUser),
+		listRecurring(userId)
 	]);
 
 	const cards = await creditCardSummaries(userId, todayForUser, paymentMethods);
@@ -76,7 +83,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			last4,
 			closingDay
 		})),
-		// Home page "Credit cards" card: on unless hidden (saved per account).
+		// Home page "Credit Cards" card: on unless hidden (saved per account).
 		showCreditCards: locals.user.showCreditCards ?? true,
 		dashboard: {
 			month: thisStart.toPlainYearMonth(),
@@ -92,6 +99,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 			trend,
 			pace,
 			cards,
+			recent: recent.map((row) => ({ ...row, kind: 'expense' as const })),
+			upcoming: upcomingCharges(recurring, todayForUser),
 			budgets: summarizeBudgets(
 				limits,
 				new Map(byCategory.map((row) => [row.id, row.cents])),

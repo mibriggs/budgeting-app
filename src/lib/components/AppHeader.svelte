@@ -39,7 +39,7 @@
 		class="mx-auto flex h-14 w-full max-w-6xl shrink-0 items-center justify-between gap-4 px-4 sm:px-6"
 	>
 		{#if home}
-			<span class="px-2 text-sm font-semibold">Budget</span>
+			<span class="px-2 text-sm font-semibold">CentJar</span>
 		{:else if back === 'settings'}
 			<!-- Settings sections: back to the cards below `large`; there are no cards at
 		     `large` and up (a sidebar instead), so back home there. -->

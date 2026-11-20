@@ -55,7 +55,7 @@
 
 <Tabs.Root value={view} onValueChange={select}>
 	<!-- h-full: as tall as the Budgets card beside it on wide screens. -->
-	<ChartCard title="Spending by category" {subtitle} class="h-full">
+	<ChartCard title="Spending by Category" {subtitle} class="h-full">
 		{#snippet actions()}
 			<Tabs.List
 				aria-label="Chart type"

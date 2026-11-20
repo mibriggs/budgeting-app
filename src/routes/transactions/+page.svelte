@@ -173,7 +173,7 @@
 </script>
 
 <svelte:head>
-	<title>Transactions · Budget</title>
+	<title>Transactions · CentJar</title>
 </svelte:head>
 
 {#snippet addButton(kind: TransactionKind)}

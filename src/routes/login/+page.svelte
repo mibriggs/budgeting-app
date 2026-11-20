@@ -20,7 +20,7 @@
 </script>
 
 <svelte:head>
-	<title>Sign in · Budget</title>
+	<title>Sign in · CentJar</title>
 </svelte:head>
 
 <!--

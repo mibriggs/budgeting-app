@@ -16,7 +16,7 @@
 	);
 </script>
 
-<ChartCard title="Income vs. expenses" subtitle="Last {months.length} months">
+<ChartCard title="Income vs. Expenses" subtitle="Last {months.length} months">
 	{#snippet table()}
 		<table class="w-full text-left tabular-nums">
 			<thead class="text-gray-500 dark:text-gray-400">

@@ -374,7 +374,7 @@
 </script>
 
 <svelte:head>
-	<title>Categories · Settings · Budget</title>
+	<title>Categories · Settings · CentJar</title>
 </svelte:head>
 
 <section aria-labelledby="section-title">

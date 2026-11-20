@@ -1,6 +1,6 @@
 {
-	"name": "Budget",
-	"short_name": "Budget",
+	"name": "CentJar",
+	"short_name": "CentJar",
 	"description": "Personal budgeting app",
 	"id": "/",
 	"start_url": "/",
