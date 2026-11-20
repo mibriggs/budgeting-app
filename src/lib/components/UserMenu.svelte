@@ -1,12 +1,13 @@
 <!--
 	@component
-	Avatar icon + name that opens a menu (sliding in and out) with Transactions, Settings, a Light/Dark/System theme
+	Initials + name that opens a menu (sliding in and out) with Transactions, Settings, a Light/Dark/System theme
 	picker and Sign Out. Works on any page:
 	signing out posts to /sign-out and clears the offline page cache first. It also turns off this
 	device's notifications, so whoever signs in next on this browser doesn't get them.
 -->
 <script lang="ts">
 	import CircleUserRound from '@lucide/svelte/icons/circle-user-round';
+	import { initials } from '#lib/initials.ts';
 	import { cubicOut } from 'svelte/easing';
 	import { prefersReducedMotion } from 'svelte/motion';
 	import { fly } from 'svelte/transition';
@@ -24,6 +25,7 @@
 	import { theme, type ThemeChoice } from '#lib/theme.svelte.ts';
 
 	let { name }: { name: string } = $props();
+	const letters = $derived(initials(name));
 
 	// Large screens have no Settings overview (the sidebar replaces it), so link to Budgets.
 	const large = createMediaQuery(LARGE_SCREEN);
@@ -64,9 +66,17 @@
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger
 		data-no-press
-		class="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:hover:bg-gray-800 dark:data-[state=open]:bg-gray-800"
+		class="flex min-w-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:hover:bg-gray-800 dark:data-[state=open]:bg-gray-800"
 	>
-		<CircleUserRound class="size-5 shrink-0" aria-hidden="true" />
+		<!-- Initials in a green circle (the app icon's green); the generic icon if there's no name. -->
+		{#if letters}
+			<span
+				class="grid size-7 shrink-0 place-items-center rounded-full bg-green-100 text-xs font-semibold text-green-800 dark:bg-green-900/60 dark:text-green-300"
+				aria-hidden="true">{letters}</span
+			>
+		{:else}
+			<CircleUserRound class="size-5 shrink-0" aria-hidden="true" />
+		{/if}
 		<span class="max-w-40 truncate">{name}</span>
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Portal>

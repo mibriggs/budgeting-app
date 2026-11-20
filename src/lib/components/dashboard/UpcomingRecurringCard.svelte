@@ -2,7 +2,8 @@
 	@component
 	Home page "Upcoming Payments" card: each recurring charge due in the next `days` days,
 	soonest first, with the total in the subtitle. A row is a date block, the name with its
-	schedule and payment method, then the amount and how far off it is (amber within 3 days).
+	schedule and payment method, then the amount and how far off it is. The date block is soft
+	blue, or amber (block and text) within 3 days.
 	Shows the first few rows (the subtitle total still covers the whole window), then a
 	"Manage recurring" link at the bottom right, level with "View all transactions" beside it.
 	- Recurring expenses exist but none fall in the window: says so and names the next one.
@@ -72,7 +73,7 @@
 							'flex w-10 shrink-0 flex-col items-center rounded-md border py-0.5 leading-tight',
 							soon
 								? 'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300'
-								: 'border-gray-200 dark:border-gray-800'
+								: 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950/60 dark:text-blue-300'
 						]}
 						aria-hidden="true"
 					>

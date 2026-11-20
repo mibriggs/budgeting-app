@@ -37,8 +37,11 @@
 </script>
 
 <dl class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-	<div class="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-		<dt class="text-xs text-gray-500 dark:text-gray-400">Income</dt>
+	<!-- Income: tinted green, the same as Net when it's positive. -->
+	<div
+		class="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950/40"
+	>
+		<dt class="text-xs text-gray-600 dark:text-gray-300">Income</dt>
 		<dd class="mt-1 text-xl font-semibold tabular-nums">{formatCentsWhole(tiles.income)}</dd>
 	</div>
 	<div class="rounded-lg border border-gray-200 p-3 dark:border-gray-800">

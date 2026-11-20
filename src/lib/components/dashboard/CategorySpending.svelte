@@ -78,8 +78,9 @@
 			<!-- Both views share one grid cell and both stay laid out, so the card is always the taller
 			     view's height and doesn't jump when switching. The inactive one is invisible and inert
 			     (not clickable, focusable or read out) instead of `hidden`, which would remove it from
-			     layout. The `child` snippet keeps Bits' tab-panel role and ids. -->
-			<div class="grid">
+			     layout. The `child` snippet keeps Bits' tab-panel role and ids. The column is
+			     `minmax(0, 1fr)` so long category names truncate instead of widening the card. -->
+			<div class="grid grid-cols-[minmax(0,1fr)]">
 				<Tabs.Content value="pie">
 					{#snippet child({ props })}
 						<div
