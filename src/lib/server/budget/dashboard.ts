@@ -62,7 +62,7 @@ export { fillMonths, paceByDay, topCategories, upcomingCharges } from '#lib/dash
 export type { CategorySlice, MonthTotals, PacePoint, UpcomingCharge } from '#lib/dashboard.ts';
 
 /** How many expenses the home page "Recent Expenses" card lists. */
-export const RECENT_LIMIT = 5;
+export const RECENT_LIMIT = 8;
 
 /**
  * The user's latest expenses up to today (future-dated ones are left out), newest first, for
