@@ -17,8 +17,7 @@
 		name,
 		home = false,
 		back = 'home',
-		inboxCount = 0,
-		onInbox
+		inboxCount = 0
 	}: {
 		/** Shown in the user menu. */
 		name: string;
@@ -29,8 +28,6 @@
 		back?: 'home' | 'settings';
 		/** Quick-add items waiting, shown in the user menu (see UserMenu). */
 		inboxCount?: number;
-		/** Replaces the user menu's link to /inbox (dev mock only). */
-		onInbox?: () => void;
 	} = $props();
 
 	const backClass =
@@ -78,6 +75,6 @@
 				Home
 			</a>
 		{/if}
-		<UserMenu {name} {inboxCount} {onInbox} />
+		<UserMenu {name} {inboxCount} />
 	</header>
 </div>

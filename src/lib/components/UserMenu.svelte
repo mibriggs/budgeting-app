@@ -28,14 +28,11 @@
 
 	let {
 		name,
-		inboxCount = 0,
-		onInbox
+		inboxCount = 0
 	}: {
 		name: string;
 		/** Quick-add items waiting in the inbox; shown on Inbox and the initials when above 0. */
 		inboxCount?: number;
-		/** Replaces the link to /inbox (the dev mock switches views instead of navigating). */
-		onInbox?: () => void;
 	} = $props();
 	const letters = $derived(initials(name));
 
@@ -123,17 +120,11 @@
 									>
 								{/if}
 							{/snippet}
-							{#if onInbox}
-								<DropdownMenu.Item class={item} onSelect={onInbox}>
-									{@render inboxLabel()}
-								</DropdownMenu.Item>
-							{:else}
-								<DropdownMenu.Item class={item}>
-									{#snippet child({ props })}
-										<a href={resolve('/inbox')} {...props}>{@render inboxLabel()}</a>
-									{/snippet}
-								</DropdownMenu.Item>
-							{/if}
+							<DropdownMenu.Item class={item}>
+								{#snippet child({ props })}
+									<a href={resolve('/inbox')} {...props}>{@render inboxLabel()}</a>
+								{/snippet}
+							</DropdownMenu.Item>
 							<DropdownMenu.Item class={item}>
 								{#snippet child({ props })}
 									<a href={resolve('/transactions')} {...props}>
