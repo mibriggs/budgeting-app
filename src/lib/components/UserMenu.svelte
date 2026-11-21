@@ -22,18 +22,21 @@
 	import { DropdownMenu } from 'bits-ui';
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { createMediaQuery, LARGE_SCREEN } from '#lib/media.svelte.ts';
 	import { clearPageCaches } from '#lib/offline.ts';
 	import { theme, type ThemeChoice } from '#lib/theme.svelte.ts';
 
 	let {
 		name,
-		inboxCount = 0
+		inboxCount: countProp
 	}: {
 		name: string;
-		/** Quick-add items waiting in the inbox; shown on Inbox and the initials when above 0. */
+		/** Quick-add items waiting in the inbox; shown on Inbox and the initials when above 0.
+		 *  Defaults to the count the root layout loads on every page. */
 		inboxCount?: number;
 	} = $props();
+	const inboxCount = $derived(countProp ?? (page.data.inboxCount as number | undefined) ?? 0);
 	const letters = $derived(initials(name));
 
 	// Large screens have no Settings overview (the sidebar replaces it), so link to Budgets.

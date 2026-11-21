@@ -18,6 +18,7 @@ import {
 	upcomingCharges
 } from '#lib/server/budget/dashboard.ts';
 import { listBudgets } from '#lib/server/budget/limits.ts';
+import { listPending } from '#lib/server/quick-add/inbox.ts';
 import { displayName } from '#lib/server/user.ts';
 import type { PageServerLoad } from './login/$types';
 
@@ -74,7 +75,10 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		spendingByCategory(userId, flowRange.from, flowRange.to)
 	]);
 
-	const cards = await creditCardSummaries(userId, todayForUser, paymentMethods);
+	const [cards, pending] = await Promise.all([
+		creditCardSummaries(userId, todayForUser, paymentMethods),
+		listPending(userId)
+	]);
 	const trend = fillMonths(trendStart.toPlainYearMonth(), thisStart.toPlainYearMonth(), months);
 	const thisMonth = trend.at(-1)!;
 	const pace = paceByDay(todayForUser, thisDaily, lastDaily);
@@ -95,6 +99,19 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		})),
 		// Home page "Credit Cards" card: on unless hidden (saved per account).
 		showCreditCards: locals.user.showCreditCards ?? true,
+		// Quick add inbox card: the first few waiting items (the count comes from the layout).
+		inboxPreview: pending.slice(0, 3).map((p) => ({
+			id: p.id,
+			status: p.status,
+			isExpense: p.isExpense,
+			name: p.name,
+			message: p.message,
+			amountCents: p.amountCents,
+			purchaseDate: p.purchaseDate,
+			categoryName: p.categoryName,
+			categoryIcon: p.categoryIcon,
+			note: p.note
+		})),
 		dashboard: {
 			month: thisStart.toPlainYearMonth(),
 			tiles: {

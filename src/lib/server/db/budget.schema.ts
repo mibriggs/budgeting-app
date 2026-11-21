@@ -437,3 +437,61 @@ export const cardReminderSent = sqliteTable(
 		check('card_reminder_sent_kind_valid', sql`${t.kind} IN ('day-before', 'day-of')`)
 	]
 );
+
+// ---------------------------------------------------------------------------
+// Quick add inbox
+//
+// Every Quick add (a pasted bank alert or a typed note) is saved here first, then read: by the
+// patterns in src/lib/quick-add/parse.ts, or by Claude when they can't fill in everything. The
+// result waits here until the user adds it as an expense (the row is then deleted) or dismisses
+// it. Nothing here counts toward any total.
+
+export const PENDING_STATUSES = ['reading', 'ready', 'failed'] as const;
+export type PendingStatus = (typeof PENDING_STATUSES)[number];
+
+export const pendingExpense = sqliteTable(
+	'pending_expense',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		/** The message exactly as pasted or typed (cleaned of control characters, capped). */
+		message: text('message').notNull(),
+		/** 'reading' until the patterns or the model finish; 'failed' if neither could read it. */
+		status: text('status', { enum: PENDING_STATUSES }).notNull().default('reading'),
+		/** Who filled in the fields: the local patterns or Claude. NULL while reading. */
+		readBy: text('read_by', { enum: ['parser', 'claude'] }),
+		/** False when the message didn't look like a purchase (a refund, a statement notice…). */
+		isExpense: integer('is_expense', { mode: 'boolean' }).notNull().default(true),
+		name: text('name'),
+		amountCents: integer('amount_cents'),
+		purchaseDate: plainDate('purchase_date'),
+		// Suggestions only, checked again when the expense is added. Single-column FKs (owner
+		// checked in code), cleared if the category or method is deleted.
+		paymentMethodId: text('payment_method_id').references(() => paymentMethod.id, {
+			onDelete: 'set null'
+		}),
+		categoryId: text('category_id').references(() => expenseCategory.id, {
+			onDelete: 'set null'
+		}),
+		/** Something to check before adding: Claude unsure, or why it couldn't be read. */
+		note: text('note'),
+		...timestamps
+	},
+	(t) => [
+		index('pending_expense_user_idx').on(t.userId, t.createdAt),
+		check('pending_expense_status_valid', sql`${t.status} IN ('reading', 'ready', 'failed')`),
+		check(
+			'pending_expense_read_by_valid',
+			sql`${t.readBy} IS NULL OR ${t.readBy} IN ('parser', 'claude')`
+		),
+		check('pending_expense_message_length', sql`length(${t.message}) BETWEEN 1 AND 2000`),
+		check('pending_expense_amount_positive', sql`${t.amountCents} IS NULL OR ${t.amountCents} > 0`),
+		check(
+			'pending_expense_date_valid',
+			sql`${t.purchaseDate} IS NULL OR date(${t.purchaseDate}) IS ${t.purchaseDate}`
+		),
+		check('pending_expense_is_expense_bool', sql`${t.isExpense} IN (0, 1)`)
+	]
+);

@@ -8,7 +8,8 @@
 // - /api/* (Better Auth) and non-GET requests always go to the network.
 //
 // Push notifications (Settings → Notifications): `push` shows what the server sent (see
-// src/lib/server/push.ts); tapping it focuses an open window of the app, or opens one.
+// src/lib/server/push.ts); tapping it focuses an open window of the app, or opens one. A Quick
+// add result goes to a visible window as a message (shown as a toast) instead, when there is one.
 
 import { self } from '$app/service-worker';
 import { immutable, assets, prerendered } from '$app/manifest';
@@ -64,7 +65,14 @@ self.addEventListener('fetch', (event) => {
 	}
 });
 
-type PushPayload = { title: string; body: string; url?: string; tag?: string };
+type PushPayload = {
+	title: string;
+	body: string;
+	url?: string;
+	tag?: string;
+	/** A Quick add item finished reading (see src/lib/server/quick-add/inbox.ts). */
+	quickAdd?: { id: string };
+};
 
 self.addEventListener('push', (event) => {
 	let payload: PushPayload;
@@ -74,13 +82,31 @@ self.addEventListener('push', (event) => {
 		payload = { title: 'CentJar', body: event.data?.text() ?? '' };
 	}
 	event.waitUntil(
-		self.registration.showNotification(payload.title, {
-			body: payload.body,
-			tag: payload.tag,
-			icon: toUrl('icons/icon-192.png'),
-			badge: toUrl('icons/icon-192.png'),
-			data: { url: payload.url ?? '/' }
-		})
+		(async () => {
+			// Quick add: if the app is open and on screen here, the page shows a toast instead (it
+			// may already have, from its own request; it shows each item once). Otherwise, notify.
+			if (payload.quickAdd) {
+				const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+				const visible = windows.filter((w) => w.visibilityState === 'visible');
+				if (visible.length > 0) {
+					for (const w of visible)
+						w.postMessage({
+							type: 'quick-add-ready',
+							id: payload.quickAdd.id,
+							title: payload.title,
+							body: payload.body
+						});
+					return;
+				}
+			}
+			await self.registration.showNotification(payload.title, {
+				body: payload.body,
+				tag: payload.tag,
+				icon: toUrl('icons/icon-192.png'),
+				badge: toUrl('icons/icon-192.png'),
+				data: { url: payload.url ?? '/' }
+			});
+		})()
 	);
 });
 

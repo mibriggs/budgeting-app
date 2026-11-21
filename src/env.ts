@@ -66,6 +66,18 @@ export const variables = defineEnvVars({
 			'A contact for push services if something goes wrong, e.g. `mailto:you@example.com`.',
 		schema: (value) => value?.trim() || undefined
 	},
+	// Quick add: when the patterns can't read a pasted alert or note (or can't tell its card or
+	// category), the server asks Claude. Optional: unset means it never calls the model.
+	ANTHROPIC_API_KEY: {
+		description:
+			'Claude API key, from a CentJar workspace in the Claude Console (set a monthly spend limit there). Used only by Quick add on the server. Unset turns the model fallback off.',
+		schema: (value) => value?.trim() || undefined
+	},
+	CLAUDE_MODEL: {
+		description:
+			'Model Quick add asks, e.g. `claude-haiku-5-5` (the default). A setting so it can change without a code change.',
+		schema: (value) => value?.trim() || 'claude-haiku-5-5'
+	},
 	CRON_SECRET: {
 		description:
 			'Secret the scheduler (cron-job.org) sends as `Authorization: Bearer …` to /api/cron/recurring. Generate with `openssl rand -base64 32`. Unset means the endpoint refuses every call.',

@@ -30,6 +30,9 @@ export type PushPayload = {
 	url?: string;
 	/** Notifications with the same tag replace each other instead of stacking. */
 	tag?: string;
+	/** A Quick add item finished reading. If the app is open and visible on the device, the
+	 *  service worker hands it to the page as a toast instead of showing a notification. */
+	quickAdd?: { id: string };
 };
 
 // ---------------------------------------------------------------------------

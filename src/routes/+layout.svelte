@@ -4,6 +4,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { online } from 'svelte/reactivity/window';
 	import { Toaster } from 'svelte-sonner';
+	import { showQuickAddReady } from '#lib/quick-add/client.ts';
 	import { theme } from '#lib/theme.svelte.ts';
 	import type { LayoutProps } from './$types';
 
@@ -34,6 +35,23 @@
 		})().catch(() => {
 			// Offline or failed; try again on the next app load.
 		});
+	});
+
+	// Quick add: a push about a finished reading arrives here (from the service worker) when the app
+	// is open and on screen, and shows as a toast instead of a notification. Once per item.
+	$effect(() => {
+		if (!('serviceWorker' in navigator)) return;
+		const onMessage = (event: MessageEvent) => {
+			const message = event.data as { type?: string; id?: string; title?: string; body?: string };
+			if (message?.type === 'quick-add-ready' && message.id)
+				showQuickAddReady({
+					id: message.id,
+					title: message.title ?? 'Ready to review',
+					body: message.body ?? ''
+				});
+		};
+		navigator.serviceWorker.addEventListener('message', onMessage);
+		return () => navigator.serviceWorker.removeEventListener('message', onMessage);
 	});
 
 	// Keep the user's saved time zone in sync with this browser so "today" and

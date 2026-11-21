@@ -17,7 +17,7 @@
 		name,
 		home = false,
 		back = 'home',
-		inboxCount = 0
+		inboxCount
 	}: {
 		/** Shown in the user menu. */
 		name: string;

@@ -113,6 +113,13 @@
       "when": 1794808109694,
       "tag": "0015_clear_removed_recurring_methods",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1795240277314,
+      "tag": "0016_quick_add_inbox",
+      "breakpoints": true
     }
   ]
 }

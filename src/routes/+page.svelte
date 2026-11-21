@@ -1,12 +1,12 @@
 <script lang="ts">
-	import ChevronRight from '@lucide/svelte/icons/chevron-right';
-	import Inbox from '@lucide/svelte/icons/inbox';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Zap from '@lucide/svelte/icons/zap';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import AddTransactionDialog from '#lib/components/AddTransactionDialog.svelte';
+	import QuickAddDialog from '#lib/components/QuickAddDialog.svelte';
+	import InboxCard from '#lib/components/dashboard/InboxCard.svelte';
 	import AppHeader from '#lib/components/AppHeader.svelte';
 	import BudgetCard from '#lib/components/dashboard/BudgetCard.svelte';
 	import CashFlowCard from '#lib/components/dashboard/CashFlowCard.svelte';
@@ -58,6 +58,7 @@
 
 	let addKind = $state<TransactionKind>('expense');
 	let addOpen = $state(false);
+	let quickAddOpen = $state(false);
 
 	// One Add button; the dialog starts on Expense (the common case) and has a switch for Income.
 	function openAdd() {
@@ -117,9 +118,8 @@
 			<Plus class="size-4" aria-hidden="true" />
 			Add
 		</button>
-		<!-- Quick add (paste a bank alert or type a shorthand, then review it in a sheet) isn't built
-		     yet: shown so the layout is settled, but disabled. -->
-		<button type="button" class="{secondary} {grow}" disabled title="Coming soon">
+		<!-- Quick add: paste a bank alert or type a shorthand, check what it read, tap a category. -->
+		<button type="button" class="{secondary} {grow}" onclick={() => (quickAddOpen = true)}>
 			<Zap class="size-4" aria-hidden="true" />
 			Quick add
 		</button>
@@ -129,27 +129,8 @@
 		</a>
 	</div>
 
-	<!-- Quick-add inbox. Always empty until Quick add is built; the page itself says Coming soon. -->
-	<section
-		class="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-800"
-		aria-labelledby="home-inbox-title"
-	>
-		<span class="grid size-8 shrink-0 place-items-center rounded-full bg-gray-100 dark:bg-gray-800">
-			<Inbox class="size-4 text-gray-500 dark:text-gray-400" aria-hidden="true" />
-		</span>
-		<div class="min-w-0 flex-1">
-			<h2 id="home-inbox-title" class="text-sm font-medium">Inbox</h2>
-			<p class="text-xs text-gray-500 dark:text-gray-400">
-				All caught up. Anything you save for later waits here.
-			</p>
-		</div>
-		<a
-			href={resolve('/inbox')}
-			class="flex shrink-0 items-center gap-0.5 text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-		>
-			Open <ChevronRight class="size-3.5" aria-hidden="true" />
-		</a>
-	</section>
+	<!-- Quick add inbox: what's waiting to be reviewed (a quiet line when nothing is). -->
+	<InboxCard items={data.inboxPreview} count={data.inboxCount} today={data.today} />
 
 	<StatTiles tiles={data.dashboard.tiles} />
 
@@ -193,6 +174,8 @@
 		<div class="lg:col-span-2"><MonthlyChart months={data.dashboard.trend} /></div>
 	</div>
 </main>
+
+<QuickAddDialog bind:open={quickAddOpen} />
 
 <AddTransactionDialog
 	bind:open={addOpen}
