@@ -1,5 +1,8 @@
 <script lang="ts">
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import Inbox from '@lucide/svelte/icons/inbox';
 	import Plus from '@lucide/svelte/icons/plus';
+	import Zap from '@lucide/svelte/icons/zap';
 	import { toast } from 'svelte-sonner';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -91,8 +94,11 @@
 
 	const primary =
 		'flex items-center justify-center gap-1.5 rounded-md border border-transparent bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-gray-700 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-200';
+	// Centred content so the buttons stay tidy when they stretch to fill the row on a phone.
 	const secondary =
-		'press rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium transition hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-800';
+		'press flex items-center justify-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium transition hover:bg-gray-100 disabled:opacity-50 disabled:hover:bg-transparent dark:border-gray-600 dark:hover:bg-gray-800 dark:disabled:hover:bg-transparent';
+	/** Phone: grow to share the row; from `sm`: natural width. */
+	const grow = 'grow whitespace-nowrap sm:grow-0';
 </script>
 
 <svelte:head>
@@ -102,14 +108,48 @@
 <AppHeader name={data.displayName} home />
 
 <main class="mx-auto flex max-w-6xl flex-col gap-4 px-4 pt-2 pb-6 sm:px-6">
-	<!-- Quick actions, left-aligned at the top (under "CentJar"). -->
-	<div class="flex flex-wrap items-center justify-start gap-3">
-		<button type="button" class={primary} onclick={openAdd}>
+	<!-- Quick actions at the top (under "CentJar"). On a phone the row spans the same width as the
+	     cards below (each button grows from its own width to share the space) and says
+	     "Transactions" instead of "View transactions"; from `sm` up they sit at the left at their
+	     natural size. Wraps on very narrow screens rather than overflowing. -->
+	<div class="flex flex-wrap items-center gap-2 sm:justify-start sm:gap-3">
+		<button type="button" class="{primary} {grow}" onclick={openAdd}>
 			<Plus class="size-4" aria-hidden="true" />
 			Add
 		</button>
-		<a href={resolve('/transactions')} class={secondary}>View transactions</a>
+		<!-- Quick add (paste a bank alert or type a shorthand, then review it in a sheet) isn't built
+		     yet: shown so the layout is settled, but disabled. -->
+		<button type="button" class="{secondary} {grow}" disabled title="Coming soon">
+			<Zap class="size-4" aria-hidden="true" />
+			Quick add
+		</button>
+		<a href={resolve('/transactions')} class="{secondary} {grow}">
+			<span class="sm:hidden">Transactions</span>
+			<span class="hidden sm:inline">View transactions</span>
+		</a>
 	</div>
+
+	<!-- Quick-add inbox. Always empty until Quick add is built; the page itself says Coming soon. -->
+	<section
+		class="flex items-center gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-800"
+		aria-labelledby="home-inbox-title"
+	>
+		<span class="grid size-8 shrink-0 place-items-center rounded-full bg-gray-100 dark:bg-gray-800">
+			<Inbox class="size-4 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+		</span>
+		<div class="min-w-0 flex-1">
+			<h2 id="home-inbox-title" class="text-sm font-medium">Inbox</h2>
+			<p class="text-xs text-gray-500 dark:text-gray-400">
+				All caught up. Anything you save for later waits here.
+			</p>
+		</div>
+		<a
+			href={resolve('/inbox')}
+			class="flex shrink-0 items-center gap-0.5 text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+		>
+			Open <ChevronRight class="size-3.5" aria-hidden="true" />
+		</a>
+	</section>
 
 	<StatTiles tiles={data.dashboard.tiles} />
 

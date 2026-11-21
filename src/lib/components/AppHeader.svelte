@@ -16,7 +16,9 @@
 	let {
 		name,
 		home = false,
-		back = 'home'
+		back = 'home',
+		inboxCount = 0,
+		onInbox
 	}: {
 		/** Shown in the user menu. */
 		name: string;
@@ -25,6 +27,10 @@
 		/** Where the back link goes (default: Home). Settings sections use "settings": a
 		 *  "Home › Settings" breadcrumb below `large`, "← Home" from `large` up. */
 		back?: 'home' | 'settings';
+		/** Quick-add items waiting, shown in the user menu (see UserMenu). */
+		inboxCount?: number;
+		/** Replaces the user menu's link to /inbox (dev mock only). */
+		onInbox?: () => void;
 	} = $props();
 
 	const backClass =
@@ -72,6 +78,6 @@
 				Home
 			</a>
 		{/if}
-		<UserMenu {name} />
+		<UserMenu {name} {inboxCount} {onInbox} />
 	</header>
 </div>

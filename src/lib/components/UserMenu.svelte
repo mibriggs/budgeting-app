@@ -1,12 +1,14 @@
 <!--
 	@component
-	Initials + name that opens a menu (sliding in and out) with Transactions, Settings, a Light/Dark/System theme
-	picker and Sign Out. Works on any page:
+	Initials + name that opens a menu (sliding in and out) with Inbox, Transactions, Settings, a
+	Light/Dark/System theme picker and Sign Out. With an `inboxCount`, Inbox and the initials show how
+	many quick-add items are waiting. Works on any page:
 	signing out posts to /sign-out and clears the offline page cache first. It also turns off this
 	device's notifications, so whoever signs in next on this browser doesn't get them.
 -->
 <script lang="ts">
 	import CircleUserRound from '@lucide/svelte/icons/circle-user-round';
+	import InboxIcon from '@lucide/svelte/icons/inbox';
 	import { initials } from '#lib/initials.ts';
 	import { cubicOut } from 'svelte/easing';
 	import { prefersReducedMotion } from 'svelte/motion';
@@ -24,7 +26,17 @@
 	import { clearPageCaches } from '#lib/offline.ts';
 	import { theme, type ThemeChoice } from '#lib/theme.svelte.ts';
 
-	let { name }: { name: string } = $props();
+	let {
+		name,
+		inboxCount = 0,
+		onInbox
+	}: {
+		name: string;
+		/** Quick-add items waiting in the inbox; shown on Inbox and the initials when above 0. */
+		inboxCount?: number;
+		/** Replaces the link to /inbox (the dev mock switches views instead of navigating). */
+		onInbox?: () => void;
+	} = $props();
 	const letters = $derived(initials(name));
 
 	// Large screens have no Settings overview (the sidebar replaces it), so link to Budgets.
@@ -69,15 +81,24 @@
 		class="flex min-w-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition hover:bg-gray-100 data-[state=open]:bg-gray-100 dark:hover:bg-gray-800 dark:data-[state=open]:bg-gray-800"
 	>
 		<!-- Initials in a green circle (the app icon's green); the generic icon if there's no name. -->
-		{#if letters}
-			<span
-				class="grid size-7 shrink-0 place-items-center rounded-full bg-green-100 text-xs font-semibold text-green-800 dark:bg-green-900/60 dark:text-green-300"
-				aria-hidden="true">{letters}</span
-			>
-		{:else}
-			<CircleUserRound class="size-5 shrink-0" aria-hidden="true" />
-		{/if}
+		<span class="relative shrink-0">
+			{#if letters}
+				<span
+					class="grid size-7 place-items-center rounded-full bg-green-100 text-xs font-semibold text-green-800 dark:bg-green-900/60 dark:text-green-300"
+					aria-hidden="true">{letters}</span
+				>
+			{:else}
+				<CircleUserRound class="size-5" aria-hidden="true" />
+			{/if}
+			{#if inboxCount}
+				<span
+					class="absolute -top-1.5 -right-1.5 min-w-4 rounded-full bg-gray-900 px-1 text-center text-[10px] leading-4 font-semibold text-white tabular-nums ring-2 ring-white dark:bg-white dark:text-gray-900 dark:ring-gray-950"
+					aria-hidden="true">{inboxCount > 99 ? '99+' : inboxCount}</span
+				>
+			{/if}
+		</span>
 		<span class="max-w-40 truncate">{name}</span>
+		{#if inboxCount}<span class="sr-only">, {inboxCount} in inbox</span>{/if}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Portal>
 		<!-- Kept mounted so it can slide in and out (Bits UI only renders `child` while open). -->
@@ -92,6 +113,27 @@
 				{#if open}
 					<div {...wrapperProps}>
 						<div {...props} transition:fly={slide}>
+							{#snippet inboxLabel()}
+								<InboxIcon class="size-4" aria-hidden="true" />
+								<span class="flex-1">Inbox</span>
+								{#if inboxCount}
+									<span
+										class="min-w-5 rounded-full bg-gray-900 px-1.5 text-center text-xs leading-5 font-semibold text-white tabular-nums dark:bg-white dark:text-gray-900"
+										>{inboxCount}</span
+									>
+								{/if}
+							{/snippet}
+							{#if onInbox}
+								<DropdownMenu.Item class={item} onSelect={onInbox}>
+									{@render inboxLabel()}
+								</DropdownMenu.Item>
+							{:else}
+								<DropdownMenu.Item class={item}>
+									{#snippet child({ props })}
+										<a href={resolve('/inbox')} {...props}>{@render inboxLabel()}</a>
+									{/snippet}
+								</DropdownMenu.Item>
+							{/if}
 							<DropdownMenu.Item class={item}>
 								{#snippet child({ props })}
 									<a href={resolve('/transactions')} {...props}>
