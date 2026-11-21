@@ -5,17 +5,17 @@
 // function is stopped, the model times out), the row stays 'reading' and is read again the next
 // time the inbox is opened (retryStuck), so nothing is lost.
 
-import { and, asc, count, eq, lt } from 'drizzle-orm';
+import { and, asc, count, desc, eq, lt } from 'drizzle-orm';
 import { today as todayIn, type PlainDate } from '#lib/dates.ts';
 import { formatCents } from '#lib/money.ts';
-import { clean, parseQuickAdd, type QuickAddContext } from '#lib/quick-add/parse.ts';
+import { parseQuickAdd, splitMessages, type QuickAddContext } from '#lib/quick-add/parse.ts';
 import { isComplete, whatsMissing, type HistoryExample } from '#lib/quick-add/prompt.ts';
 import { isActiveCategory, listActiveCategories } from '#lib/server/budget/categories.ts';
 import { recentExpenses } from '#lib/server/budget/dashboard.ts';
 import { isActivePaymentMethod, listPaymentMethods } from '#lib/server/budget/payment-methods.ts';
 import { createTransaction } from '#lib/server/budget/transactions.ts';
 import { db } from '#lib/server/db/index.ts';
-import { expenseCategory, pendingExpense } from '#lib/server/db/schema.ts';
+import { expense, expenseCategory, pendingExpense } from '#lib/server/db/schema.ts';
 import { notify } from '#lib/server/push.ts';
 import { MAX_NAME_LENGTH, parseAmount, parseDate } from '#lib/transaction-input.ts';
 import { askClaude, modelAvailable } from './claude.ts';
@@ -29,6 +29,8 @@ const STUCK_AFTER_MS = 2 * 60 * 1000;
 const MODEL_CALLS_PER_HOUR = 30;
 /** How many recent expenses go in the prompt as examples (distinct names only). */
 const HISTORY_EXAMPLES = 15;
+/** How many of the user's latest expenses the parser learns names → categories from. */
+const HISTORY_ROWS = 2000;
 
 type User = { id: string; timezone?: string | null };
 
@@ -51,11 +53,22 @@ async function loadContext(
 	user: User
 ): Promise<{ ctx: QuickAddContext; history: HistoryExample[] }> {
 	const today = todayIn(user.timezone ?? undefined);
-	const [categories, methods, recent] = await Promise.all([
+	const [categories, methods, recent, past] = await Promise.all([
 		listActiveCategories(user.id, 'expense'),
 		listPaymentMethods(user.id),
-		recentExpenses(user.id, today, 40)
+		recentExpenses(user.id, today, 40),
+		// Learning from history: each name's latest category ("Star Market" → Groceries).
+		db
+			.select({ name: expense.name, categoryId: expense.categoryId })
+			.from(expense)
+			.where(eq(expense.userId, user.id))
+			.orderBy(desc(expense.purchaseDate), desc(expense.createdAt))
+			.limit(HISTORY_ROWS)
 	]);
+	const pastSeen = new Set<string>();
+	const pastCategories = past.filter(
+		(r) => !pastSeen.has(r.name.toLowerCase()) && pastSeen.add(r.name.toLowerCase())
+	);
 	const seen = new Set<string>();
 	const history = recent
 		.filter((r) => !seen.has(r.name.toLowerCase()) && seen.add(r.name.toLowerCase()))
@@ -71,7 +84,8 @@ async function loadContext(
 				last4,
 				closingDay
 			})),
-			today
+			today,
+			history: pastCategories
 		},
 		history
 	};
@@ -90,8 +104,10 @@ type Reading = {
 	note: string | null;
 };
 
-async function read(message: string, user: User): Promise<Reading> {
-	const { ctx, history } = await loadContext(user);
+type Loaded = Awaited<ReturnType<typeof loadContext>>;
+
+async function read(message: string, user: User, loaded?: Loaded): Promise<Reading> {
+	const { ctx, history } = loaded ?? (await loadContext(user));
 	const local = parseQuickAdd(message, ctx);
 	const fromParser = (note: string | null): Reading =>
 		local.ok
@@ -167,33 +183,41 @@ export function summary(item: {
 }
 
 /**
- * Saves a message to the inbox and reads it. Returns the stored item. When `pushEndpoint` is
- * given (the device that sent it), that device gets a push when the reading is done; the service
- * worker shows it as a toast instead if the app is open there.
+ * Saves a paste to the inbox and reads it. A paste with several alerts or notes becomes one item
+ * each (see splitMessages). Returns the stored items. When `pushEndpoint` is given (the device
+ * that sent it), that device gets one push when they're all read; the service worker shows it as
+ * a toast instead if the app is open there.
  */
-export async function addToInbox(user: User, rawMessage: string, pushEndpoint?: string) {
-	const message = clean(rawMessage).slice(0, 2000);
-	if (!message) return { error: 'The message is empty.' } as const;
+export async function addToInbox(user: User, raw: string, pushEndpoint?: string) {
+	const messages = splitMessages(raw);
+	if (messages.length === 0) return { error: 'The message is empty.' } as const;
 	const [{ total }] = await db
 		.select({ total: count() })
 		.from(pendingExpense)
 		.where(eq(pendingExpense.userId, user.id));
-	if (total >= MAX_PENDING)
-		return { error: `The inbox is full (${MAX_PENDING}). Add or dismiss some first.` } as const;
+	if (total + messages.length > MAX_PENDING)
+		return {
+			error: `The inbox holds ${MAX_PENDING} items and has ${total}. Add or dismiss some first.`
+		} as const;
 
-	const [row] = await db
+	// Saved first (as "Reading…"), so nothing is lost if reading stops partway.
+	const rows = await db
 		.insert(pendingExpense)
-		.values({ userId: user.id, message })
-		.returning({ id: pendingExpense.id });
-	const item = await readAndStore(user, row.id, message);
-	if (item && pushEndpoint) await tellDevice(user.id, item, pushEndpoint);
-	return { item } as const;
+		.values(messages.map((message) => ({ userId: user.id, message: message.slice(0, 2000) })))
+		.returning({ id: pendingExpense.id, message: pendingExpense.message });
+	const loaded = await loadContext(user);
+	await Promise.all(rows.map((row) => readAndStore(user, row.id, row.message, loaded)));
+
+	const ids = rows.map((r) => r.id);
+	const items = (await listPending(user.id)).filter((i) => ids.includes(i.id));
+	if (items.length && pushEndpoint) await tellDevice(user.id, items, pushEndpoint);
+	return { items } as const;
 }
 
-async function readAndStore(user: User, id: string, message: string) {
+async function readAndStore(user: User, id: string, message: string, loaded?: Loaded) {
 	let reading: Reading;
 	try {
-		reading = await read(message, user);
+		reading = await read(message, user, loaded);
 	} catch (error) {
 		console.error('Quick add: reading failed', error);
 		reading = {
@@ -215,21 +239,39 @@ async function readAndStore(user: User, id: string, message: string) {
 	return (await listPending(user.id)).find((i) => i.id === id) ?? null;
 }
 
-async function tellDevice(userId: string, item: PendingItem, endpoint: string) {
+/** The toast and push wording for a batch of read items (one push per paste). */
+export function announcement(items: PendingItem[]) {
+	const failed = items.filter((i) => i.status === 'failed').length;
+	if (items.length === 1)
+		return {
+			title: failed ? 'Quick add needs a hand' : 'Quick add: ready to review',
+			body: summary(items[0])
+		};
+	const lines = items.slice(0, 3).map((i) => summary(i));
+	if (items.length > 3) lines.push(`and ${items.length - 3} more`);
+	return {
+		title: `Quick add: ${items.length} ready to review`,
+		body: lines.join('\n')
+	};
+}
+
+/** Identifies a batch of items in a toast or push, so each batch is announced once. */
+export const batchKey = (items: { id: string }[]) => items.map((i) => i.id).join(',');
+
+async function tellDevice(userId: string, items: PendingItem[], endpoint: string) {
 	try {
 		await notify(
 			userId,
 			{
-				title: item.status === 'failed' ? 'Quick add needs a hand' : 'Quick add: ready to review',
-				body: summary(item),
+				...announcement(items),
 				url: '/inbox',
-				tag: `quick-add-${item.id}`,
-				quickAdd: { id: item.id }
+				tag: `quick-add-${items[0].id}`,
+				quickAdd: { id: batchKey(items) }
 			},
 			{ endpoint }
 		);
 	} catch (error) {
-		// A failed push isn't worth failing the request over: the item is in the inbox either way.
+		// A failed push isn't worth failing the request over: the items are in the inbox either way.
 		console.error('Quick add: push failed', error);
 	}
 }

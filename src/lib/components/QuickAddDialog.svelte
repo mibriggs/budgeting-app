@@ -18,6 +18,10 @@
 
 	let text = $state('');
 	let problem = $state<string | null>(null);
+	/** Closed by sending (often with Enter): don't hand focus back to the Quick add button, or the
+	 *  browser treats it as keyboard focus and draws its focus ring there. Escape and Cancel still
+	 *  return focus as usual. */
+	let sent = false;
 
 	// Each time it opens: start empty, then fill in the clipboard if it can be read silently.
 	$effect(() => {
@@ -56,6 +60,7 @@
 		event.preventDefault();
 		const message = text.trim();
 		if (!message) return;
+		sent = true;
 		open = false;
 		// Not awaited: it reports back with toasts after the sheet has closed.
 		sendQuickAdd(message);
@@ -69,14 +74,20 @@
 	<Dialog.Portal>
 		<Dialog.Overlay class="fixed inset-0 z-50 bg-black/40" />
 		<Dialog.Content
+			onCloseAutoFocus={(event) => {
+				if (!sent) return;
+				sent = false;
+				event.preventDefault();
+				(document.activeElement as HTMLElement | null)?.blur();
+			}}
 			class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md -translate-1/2 overflow-y-auto rounded-lg border border-gray-200 bg-white p-5 text-gray-900 shadow-xl outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 		>
 			<form class="flex flex-col gap-4" onsubmit={send}>
 				<div>
 					<Dialog.Title class="text-base font-semibold">Quick add</Dialog.Title>
 					<Dialog.Description class="text-xs text-gray-500 dark:text-gray-400">
-						A bank alert, or a shorthand like "5.06 apple card snacks". It goes to your inbox to
-						review.
+						A bank alert or a shorthand like "5.06 apple card snacks". Several at once? Paste them
+						all, one per line. They go to your inbox to review.
 					</Dialog.Description>
 				</div>
 
@@ -86,8 +97,8 @@
 						rows="3"
 						aria-label="Message"
 						placeholder="Paste or type here"
-						maxlength="2000"
-						class="w-full resize-y rounded-md border-gray-300 text-sm dark:border-gray-700 dark:bg-gray-900"
+						maxlength="10000"
+						class="w-full resize-y rounded-md border-gray-300 bg-white text-sm text-gray-900 focus:border-gray-500 focus:ring-gray-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 						oninput={() => (problem = null)}
 						onkeydown={(e) => {
 							// Enter sends; Shift+Enter makes a new line.

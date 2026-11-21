@@ -16,6 +16,12 @@ export type QuickAddContext = {
 	categories: { id: string; name: string }[];
 	paymentMethods: PaymentMethodOption[];
 	today: PlainDate;
+	/**
+	 * Learning from history: names of the user's past expenses and the category each was filed
+	 * under, most recent first. A message whose name matches one ("Star Market" again) gets the
+	 * same category, ahead of the common-word hints.
+	 */
+	history?: { name: string; categoryId: string }[];
 };
 
 /** Largest amount accepted ($100,000), so a stray number can't become a huge expense. */
@@ -42,8 +48,9 @@ export function proposedExpenseSchema(ctx: QuickAddContext) {
 			.refine((id) => id === null || categoryIds.has(id), 'Not one of your categories'),
 		/** How the payment method was found, for checking the parser's work. */
 		paymentMatchedBy: z.enum(['last4', 'name', 'card', 'pay-app']).nullable(),
-		/** How the category was found: one of the user's category names, or a common word. */
-		categoryMatchedBy: z.enum(['name', 'keyword']).nullable(),
+		/** How the category was found: one of the user's category names, a past expense with the
+		 *  same name, or a common word. */
+		categoryMatchedBy: z.enum(['name', 'history', 'keyword']).nullable(),
 		/** The merchant exactly as the bank wrote it ("STAR OSCO 3588"); null for shorthand. */
 		merchantRaw: z.string().nullable()
 	});
@@ -220,11 +227,39 @@ function matchPaymentMethod(
 // -------------------------------------------------------------------------------------------------
 // Category
 
-/** A category for `text`: one whose name it mentions, else one a common word points to. */
+/** Lowercase letters and digits only, single-spaced: how names are compared with history. */
+const nameKey = (name: string) =>
+	name
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, ' ')
+		.trim();
+
+/**
+ * A category for a message, in order: one of the user's category names it mentions ("5 groceries"),
+ * the category of a past expense with the same name (learning from history), then one a common
+ * word or known merchant points to. With `historyFirst` (bank alerts, whose merchant text the user
+ * didn't write), history goes before the category names too.
+ */
 function matchCategory(
 	text: string,
-	categories: { id: string; name: string }[]
-): { id: string; by: 'name' | 'keyword' } | null {
+	categories: { id: string; name: string }[],
+	name: string | null = null,
+	history: QuickAddContext['history'] = [],
+	historyFirst = false
+): { id: string; by: 'name' | 'history' | 'keyword' } | null {
+	const fromHistory = () => {
+		if (!name) return null;
+		const key = nameKey(name);
+		const past = history.find((h) => nameKey(h.name) === key);
+		return past && categories.some((c) => c.id === past.categoryId)
+			? { id: past.categoryId, by: 'history' as const }
+			: null;
+	};
+	if (historyFirst) {
+		const past = fromHistory();
+		if (past) return past;
+	}
+
 	const words = text.toLowerCase().match(/[a-z]+/g) ?? [];
 	const stem = (w: string) => w.replace(/(ies|es|s)$/, '');
 
@@ -244,6 +279,9 @@ function matchCategory(
 			return { id: c.id, by: 'name' };
 		}
 	}
+	// The user's own past choice for this name beats the general hints below.
+	const past = fromHistory();
+	if (past) return past;
 	for (const hint of CATEGORY_HINTS) {
 		if (!hint.words.some((h) => wordRe(h).test(text))) continue;
 		// The hint's names in order of preference: "subscription" before "entertainment".
@@ -276,6 +314,44 @@ const BANK_LIKE = new RegExp(
 	'i'
 );
 
+/** Most messages one paste may hold. */
+export const MAX_MESSAGES = 20;
+/** A line that starts with an amount ("5.06 apple card snacks", "$12 lunch"). */
+const AMOUNT_FIRST = /^\$?\d/;
+
+/**
+ * Splits a paste into separate messages, so several alerts or notes become separate inbox items.
+ * - A blank line always ends a message.
+ * - In a block with no bank alert in it (a list of typed notes), every line is its own message.
+ * - In a block with bank alerts, a new message starts at each line that opens like an alert
+ *   ("Chase …:", "Discover Card Alert:") or starts with an amount; other lines are the previous
+ *   message wrapping ("No Action needed.", "See it at https://…") and stay with it.
+ * Each message is cleaned; at most MAX_MESSAGES are kept.
+ */
+export function splitMessages(text: string): string[] {
+	const messages: string[] = [];
+	for (const block of text.replace(/\r\n?/g, '\n').split(/\n\s*\n/)) {
+		const lines = block
+			.split('\n')
+			.map((l) => l.trim())
+			.filter(Boolean);
+		if (!lines.some((l) => BANK_LIKE.test(l))) {
+			messages.push(...lines);
+			continue;
+		}
+		let current: string[] = [];
+		for (const line of lines) {
+			if (current.length && (BANK_LIKE.test(line) || AMOUNT_FIRST.test(line))) {
+				messages.push(current.join(' '));
+				current = [];
+			}
+			current.push(line);
+		}
+		if (current.length) messages.push(current.join(' '));
+	}
+	return messages.map(clean).filter(Boolean).slice(0, MAX_MESSAGES);
+}
+
 function fromBankAlert(
 	source: 'chase-alert' | 'discover-alert',
 	cardText: string,
@@ -290,12 +366,13 @@ function fromBankAlert(
 		return { ok: false, needsModel: true, reason: `Couldn't read the date "${dateText}".` };
 	const merchant = normalizeMerchant(merchantRaw);
 	const method = matchPaymentMethod(cardText, ctx.paymentMethods);
-	const category = matchCategory(merchant, ctx.categories);
+	const name = brandName(merchant) ?? (titleCase(merchant) || merchantRaw.trim());
+	const category = matchCategory(merchant, ctx.categories, name, ctx.history, true);
 	return {
 		ok: true,
 		expense: {
 			source,
-			name: brandName(merchant) ?? (titleCase(merchant) || merchantRaw.trim()),
+			name,
 			amountCents: toCents(whole, fraction),
 			date: date.toString(),
 			paymentMethodId: method?.id ?? null,
@@ -351,13 +428,14 @@ function fromShorthand(text: string, ctx: QuickAddContext): ParseResult {
 		.trim()
 		.replace(/^(at|on|for)\s+/i, '');
 	if (!description) return { ok: false, needsModel: true, reason: 'No description found.' };
-	const category = matchCategory(description, ctx.categories);
+	const name = brandName(description) ?? description[0].toUpperCase() + description.slice(1);
+	const category = matchCategory(description, ctx.categories, name, ctx.history);
 
 	return {
 		ok: true,
 		expense: {
 			source: 'shorthand',
-			name: description[0].toUpperCase() + description.slice(1),
+			name,
 			amountCents,
 			date: date.toString(),
 			paymentMethodId: method?.id ?? null,

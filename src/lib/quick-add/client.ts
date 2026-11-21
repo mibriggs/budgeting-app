@@ -1,4 +1,5 @@
-// Quick add in the browser: send a message to the inbox and tell the user when it's been read.
+// Quick add in the browser: send a paste to the inbox and tell the user when it's been read.
+// A paste with several alerts or notes becomes several items, announced together.
 //
 // The sheet closes as soon as sendQuickAdd starts. A "Reading…" toast shows while the server
 // reads it, then turns into the result with a Review button (to /inbox). The server also pushes
@@ -9,7 +10,7 @@ import { toast } from 'svelte-sonner';
 import { goto, invalidateAll } from '$app/navigation';
 import { resolve } from '$app/paths';
 
-/** Items already announced, so the push and the response don't both make a toast. */
+/** Batches already announced, so the push and the response don't both make a toast. */
 const announced = new Set<string>();
 
 /** This device's push address, if notifications are on here (so only it gets the push). */
@@ -23,7 +24,7 @@ async function pushEndpoint(): Promise<string | undefined> {
 	}
 }
 
-/** The finished toast: what was read, and Review to open the inbox. Shown once per item. */
+/** The finished toast: what was read, and Review to open the inbox. Shown once per batch. */
 export function showQuickAddReady(
 	item: { id: string; title: string; body: string },
 	replace?: string
@@ -34,7 +35,8 @@ export function showQuickAddReady(
 	announced.add(item.id);
 	toast(item.title, {
 		id: `quick-add-${item.id}`,
-		description: item.body,
+		// A batch lists one item per line (for the push); a toast shows it on one line.
+		description: item.body.split('\n').join('; '),
 		duration: 10_000,
 		action: { label: 'Review', onClick: () => goto(resolve('/inbox')) }
 	});
@@ -43,10 +45,10 @@ export function showQuickAddReady(
 
 let sending = 0;
 
-/** Sends a pasted alert or typed note to the inbox; reports back with toasts. */
+/** Sends a paste (one or more alerts or notes) to the inbox; reports back with toasts. */
 export async function sendQuickAdd(message: string) {
 	const loadingId = `quick-add-sending-${++sending}`;
-	toast.loading('Reading your expense…', { id: loadingId });
+	toast.loading('Reading…', { id: loadingId });
 	try {
 		const response = await fetch('/quick-add', {
 			method: 'POST',
@@ -54,21 +56,14 @@ export async function sendQuickAdd(message: string) {
 			body: JSON.stringify({ message, pushEndpoint: await pushEndpoint() })
 		});
 		const body = await response.json().catch(() => null);
-		if (!response.ok || !body?.item) {
+		if (!response.ok || !body?.key) {
 			toast.error(body?.message ?? 'Couldn’t save that to the inbox. Please try again.', {
 				id: loadingId
 			});
 			return;
 		}
-		const item = body.item as { id: string; status: string; summary: string };
-		showQuickAddReady(
-			{
-				id: item.id,
-				title: item.status === 'failed' ? 'Quick add needs a hand' : 'Ready to review',
-				body: item.summary
-			},
-			loadingId
-		);
+		// Worded and keyed like the push for the same batch, so only one of them shows.
+		showQuickAddReady({ id: body.key, title: body.title, body: body.body }, loadingId);
 	} catch {
 		toast.error(
 			navigator.onLine

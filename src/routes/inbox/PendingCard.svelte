@@ -341,7 +341,7 @@
 	</div>
 	{#if showMessage}
 		<p
-			class="rounded-md bg-gray-50 p-3 text-xs break-words whitespace-pre-wrap text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+			class="rounded-md bg-gray-50 p-3 text-xs wrap-break-word whitespace-pre-wrap text-gray-700 dark:bg-gray-900 dark:text-gray-300"
 		>
 			{item.message}
 		</p>

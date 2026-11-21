@@ -24,6 +24,10 @@
 	/* Native controls (selects, scrollbars, date inputs) match the chosen theme. */
 	html {
 		color-scheme: light;
+		/* Keep the scrollbar's space even while a dialog locks scrolling (see the lock rule at the
+		   end of this file), so the page doesn't shift sideways when one opens or closes.
+		   No effect with overlay scrollbars (macOS/iOS default). */
+		scrollbar-gutter: stable;
 	}
 	html.dark {
 		color-scheme: dark;
