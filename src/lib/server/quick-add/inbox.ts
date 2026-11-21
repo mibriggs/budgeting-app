@@ -5,8 +5,8 @@
 // function is stopped, the model times out), the row stays 'reading' and is read again the next
 // time the inbox is opened (retryStuck), so nothing is lost.
 
-import { and, asc, count, desc, eq, lt } from 'drizzle-orm';
-import { today as todayIn, type PlainDate } from '#lib/dates.ts';
+import { and, asc, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { Temporal, today as todayIn, type PlainDate } from '#lib/dates.ts';
 import { formatCents } from '#lib/money.ts';
 import { parseQuickAdd, splitMessages, type QuickAddContext } from '#lib/quick-add/parse.ts';
 import { isComplete, whatsMissing, type HistoryExample } from '#lib/quick-add/prompt.ts';
@@ -19,6 +19,7 @@ import {
 	expense,
 	expenseCategory,
 	pendingExpense,
+	quickAddUse,
 	user as userTable
 } from '#lib/server/db/schema.ts';
 import { notify } from '#lib/server/push.ts';
@@ -27,11 +28,15 @@ import { askClaude, modelAvailable } from './claude.ts';
 
 /** Most items one inbox may hold, so a stuck script can't fill the table. */
 export const MAX_PENDING = 100;
+/** Per-user Quick add limits, counted in the database so they hold across server instances.
+ *  Pastes per second and per minute stop a double tap or a runaway script. Claude readings per
+ *  day (from the user's local midnight) cap the model spend per account; items the patterns read
+ *  alone don't count. Past the daily cap, items are still saved and read by the patterns. */
+export const SENDS_PER_SECOND = 1;
+export const SENDS_PER_MINUTE = 10;
+export const CLAUDE_READINGS_PER_DAY = 100;
 /** A row still 'reading' after this long is assumed stopped partway, and read again. */
 const STUCK_AFTER_MS = 2 * 60 * 1000;
-/** Model calls allowed per user per hour (in memory, so per server instance): a guard against a
- *  stuck loop, not a hard limit. The workspace spend limit in the Claude Console is the hard one. */
-const MODEL_CALLS_PER_HOUR = 30;
 /** How many recent expenses go in the prompt as examples (distinct names only). */
 const HISTORY_EXAMPLES = 15;
 /** How many of the user's latest expenses the parser learns names → categories from. */
@@ -44,14 +49,83 @@ export type PendingItem = Awaited<ReturnType<typeof listPending>>[number];
 // -------------------------------------------------------------------------------------------------
 // Reading
 
-const calls = new Map<string, number[]>();
-function allowModelCall(userId: string): boolean {
-	const now = Date.now();
-	const recent = (calls.get(userId) ?? []).filter((t) => now - t < 60 * 60 * 1000);
-	if (recent.length >= MODEL_CALLS_PER_HOUR) return false;
-	calls.set(userId, [...recent, now]);
-	return true;
+/** Start of today in the user's time zone (UTC if theirs isn't valid), for the daily cap. */
+function startOfDay(timeZone?: string | null): Date {
+	let zone = timeZone || 'UTC';
+	try {
+		Temporal.Now.zonedDateTimeISO(zone);
+	} catch {
+		zone = 'UTC';
+	}
+	return new Date(Temporal.Now.zonedDateTimeISO(zone).startOfDay().epochMilliseconds);
 }
+
+/** How many of today's Claude readings the user has used (for Settings → AI). */
+export async function claudeReadingsToday(user: User) {
+	const [{ used }] = await db
+		.select({ used: count() })
+		.from(quickAddUse)
+		.where(
+			and(
+				eq(quickAddUse.userId, user.id),
+				eq(quickAddUse.kind, 'claude'),
+				gte(quickAddUse.createdAt, startOfDay(user.timezone))
+			)
+		);
+	return { used, limit: CLAUDE_READINGS_PER_DAY };
+}
+
+/**
+ * Records one use of `kind` if the user has fewer than `max` of that kind since each `since`.
+ * One statement, so requests running side by side (the readings of one paste run in parallel)
+ * can't all slip under the limit. True if it was recorded.
+ */
+async function recordUse(
+	userId: string,
+	kind: 'send' | 'claude',
+	limits: { since: Date; max: number }[]
+): Promise<boolean> {
+	const under = limits.map(
+		({ since, max }) =>
+			sql`(SELECT count(*) FROM ${quickAddUse} WHERE ${quickAddUse.userId} = ${userId} AND ${quickAddUse.kind} = ${kind} AND ${quickAddUse.createdAt} >= ${since.getTime()}) < ${max}`
+	);
+	const result = await db.run(
+		sql`INSERT INTO ${quickAddUse} (id, user_id, kind) SELECT ${crypto.randomUUID()}, ${userId}, ${kind} WHERE ${sql.join(under, sql` AND `)}`
+	);
+	return result.rowsAffected > 0;
+}
+
+/** Records an accepted paste, or says why it's refused (too many too fast). */
+async function recordSend(userId: string): Promise<string | null> {
+	const now = Date.now();
+	const second = new Date(now - 1000);
+	const recorded = await recordUse(userId, 'send', [
+		{ since: second, max: SENDS_PER_SECOND },
+		{ since: new Date(now - 60_000), max: SENDS_PER_MINUTE }
+	]);
+	// Clear this user's records from before yesterday; the limits never look that far back.
+	await db
+		.delete(quickAddUse)
+		.where(
+			and(eq(quickAddUse.userId, userId), lt(quickAddUse.createdAt, new Date(now - 2 * DAY_MS)))
+		);
+	if (recorded) return null;
+	const [{ recent }] = await db
+		.select({ recent: count() })
+		.from(quickAddUse)
+		.where(
+			and(
+				eq(quickAddUse.userId, userId),
+				eq(quickAddUse.kind, 'send'),
+				gte(quickAddUse.createdAt, second)
+			)
+		);
+	return recent >= SENDS_PER_SECOND
+		? 'Sent too quickly. Wait a moment and try again.'
+		: 'That’s a lot of Quick adds at once. Wait a minute and try again.';
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** This user's own lists, loaded here so the model only ever sees (and picks from) their data.
  *  Also whether they've opted in to Claude (Settings → AI), read from the database rather than the
@@ -152,8 +226,13 @@ async function read(message: string, user: User, loaded?: Loaded): Promise<Readi
 	// Claude only for accounts that opted in, and only when the server has an API key. Otherwise
 	// it's the patterns alone, which is the default.
 	if (!aiEnabled || !modelAvailable()) return fromParser(local.ok ? whatsMissing(local) : null);
-	if (!allowModelCall(user.id))
-		return fromParser('Too many readings this hour, so Claude didn’t check this one.');
+	const allowed = await recordUse(user.id, 'claude', [
+		{ since: startOfDay(user.timezone), max: CLAUDE_READINGS_PER_DAY }
+	]);
+	if (!allowed)
+		return fromParser(
+			`You’ve used today’s ${CLAUDE_READINGS_PER_DAY} Claude readings, so Claude didn’t check this one. They reset at midnight.`
+		);
 
 	const model = await askClaude(message, ctx, local, history);
 	if (!model.ok) return fromParser(`Claude couldn’t check this (${model.error})`);
@@ -215,6 +294,8 @@ export async function addToInbox(user: User, raw: string, pushEndpoint?: string)
 		return {
 			error: `The inbox holds ${MAX_PENDING} items and has ${total}. Add or dismiss some first.`
 		} as const;
+	const tooFast = await recordSend(user.id);
+	if (tooFast) return { error: tooFast, status: 429 } as const;
 
 	// Saved first (as "Reading…"), so nothing is lost if reading stops partway.
 	const rows = await db

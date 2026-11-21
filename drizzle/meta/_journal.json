@@ -127,6 +127,13 @@
       "when": 1795292204354,
       "tag": "0017_ai_enabled",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1795297308126,
+      "tag": "0018_quick_add_limits",
+      "breakpoints": true
     }
   ]
 }

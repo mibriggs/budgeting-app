@@ -24,7 +24,7 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	if (!body.success) error(400, 'Send { "message": "…" } with 1 to 10,000 characters.');
 
 	const result = await addToInbox(locals.user, body.data.message, body.data.pushEndpoint);
-	if ('error' in result) error(400, result.error);
+	if ('error' in result) error(('status' in result && result.status) || 400, result.error);
 	return json({
 		items: result.items.map((i) => ({ id: i.id, status: i.status })),
 		...announcement(result.items),

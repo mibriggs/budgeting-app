@@ -495,3 +495,25 @@ export const pendingExpense = sqliteTable(
 		check('pending_expense_is_expense_bool', sql`${t.isExpense} IN (0, 1)`)
 	]
 );
+
+/**
+ * Quick add use, kept for the per-user limits: a 'send' row per accepted paste (a few per second
+ * and per minute) and a 'claude' row per item Claude read (a daily cap; items the patterns read
+ * alone are free). Inbox rows are deleted when added or dismissed, so they can't be counted for
+ * this. Rows older than two days are cleared on the user's next paste.
+ */
+export const quickAddUse = sqliteTable(
+	'quick_add_use',
+	{
+		id: text('id').primaryKey().$defaultFn(uuid),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		kind: text('kind', { enum: ['send', 'claude'] }).notNull(),
+		createdAt: timestamps.createdAt
+	},
+	(t) => [
+		index('quick_add_use_user_idx').on(t.userId, t.kind, t.createdAt),
+		check('quick_add_use_kind_valid', sql`${t.kind} IN ('send', 'claude')`)
+	]
+);

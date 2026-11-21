@@ -1,7 +1,8 @@
 <!--
 	Settings → AI. One switch, saved to the account (every device), off unless the user turns it on:
 	whether Quick add may ask Claude when the built-in patterns can't fill everything in. Greyed
-	out when the server has no Anthropic API key, since Claude can't run there either way.
+	out when the server has no Anthropic API key, since Claude can't run there either way. While
+	it's on, shows today's Claude readings against the daily cap (CLAUDE_READINGS_PER_DAY).
 -->
 <script lang="ts">
 	import { Switch } from 'bits-ui';
@@ -34,6 +35,7 @@
 	}
 
 	const on = $derived(enabled && data.modelAvailable);
+	const { used, limit } = $derived(data.readings);
 </script>
 
 <svelte:head>
@@ -89,6 +91,23 @@
 					Patterns still go first. Claude is asked only when they can’t fill in everything, and you
 					still review every item before it’s saved.
 				</p>
+				<div class="mt-3 flex flex-col gap-1.5">
+					<div
+						class="h-1.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
+						role="img"
+						aria-label="{used} of {limit} Claude readings used today"
+					>
+						<div
+							class="h-full rounded-full bg-gray-900 dark:bg-white"
+							style:width="{Math.min(used / limit, 1) * 100}%"
+						></div>
+					</div>
+					<p class="text-xs text-gray-500 dark:text-gray-400">
+						{used} of {limit} Claude readings used today. {used >= limit
+							? 'Until midnight, the patterns read new items on their own.'
+							: 'Resets at midnight.'} Items the patterns read alone don’t count.
+					</p>
+				</div>
 			{:else}
 				<p class="font-medium text-gray-900 dark:text-white">While it’s off</p>
 				<p class="mt-1">

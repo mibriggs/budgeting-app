@@ -117,6 +117,9 @@ export async function askClaude(
 			return { ok: false, error: 'Rate limited or over the spend limit. Try again later.' };
 		if (error instanceof Anthropic.BadRequestError)
 			return { ok: false, error: `The request was rejected: ${error.message}` };
+		// Timeouts and network failures are APIErrors too, but with no status.
+		if (error instanceof Anthropic.APIConnectionError)
+			return { ok: false, error: 'Couldn’t reach the model (timeout or network).' };
 		if (error instanceof Anthropic.APIError)
 			return { ok: false, error: `The API returned ${error.status}: ${error.message}` };
 		return { ok: false, error: 'Couldn’t reach the model (timeout or network).' };
