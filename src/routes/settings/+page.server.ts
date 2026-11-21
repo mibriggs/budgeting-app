@@ -10,6 +10,7 @@ import { spendingByCategory } from '#lib/server/budget/dashboard.ts';
 import { listBudgets } from '#lib/server/budget/limits.ts';
 import { generateDueCharges, listRecurring } from '#lib/server/budget/recurring.ts';
 import { listDevices, pushConfigured } from '#lib/server/push.ts';
+import { modelAvailable } from '#lib/server/quick-add/claude.ts';
 import type { PageServerLoad } from './$types';
 
 // Settings overview: a card per section with a short summary of what's in it. Everything is
@@ -81,6 +82,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		categories: { expense: expenseCategories.length, income: incomeCategories.length },
 		// Endpoints let the page tell whether this browser is one of them ("On for this device").
 		notifications: { configured: pushConfigured, endpoints: devices.map((d) => d.endpoint) },
+		ai: { enabled: locals.user.aiEnabled ?? false, available: modelAvailable() },
 		widget: {
 			tokens: tokens.length,
 			lastUsedAt: tokens.reduce<Date | null>(

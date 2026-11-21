@@ -9,6 +9,7 @@
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import Repeat from '@lucide/svelte/icons/repeat';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import Tags from '@lucide/svelte/icons/tags';
 	import Wallet from '@lucide/svelte/icons/wallet';
 	import type { Snippet } from 'svelte';
@@ -24,7 +25,8 @@
 		| '/settings/categories'
 		| '/settings/payment-methods'
 		| '/settings/notifications'
-		| '/settings/widget';
+		| '/settings/widget'
+		| '/settings/ai';
 
 	let { data }: PageProps = $props();
 
@@ -250,6 +252,22 @@
 	</span>
 {/snippet}
 
+{#snippet aiBody()}
+	{@const on = data.ai.enabled && data.ai.available}
+	<span class="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-400">
+		<span class="flex items-center gap-1.5">
+			<span
+				class={[
+					'size-1.5 shrink-0 rounded-full',
+					on ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+				]}
+			></span>
+			{!data.ai.available ? 'Not set up on the server' : on ? 'On' : 'Off'}
+		</span>
+		<span>Claude in Quick add</span>
+	</span>
+{/snippet}
+
 <div class="grid max-w-3xl grid-cols-2 gap-3 lg:grid-cols-4">
 	{@render card('/settings/budgets', 'Budgets', Wallet, true, budgetsBody)}
 	{@render card('/settings/recurring', 'Recurring', Repeat, true, recurringBody)}
@@ -257,4 +275,5 @@
 	{@render card('/settings/payment-methods', 'Payment Methods', CreditCard, false, paymentBody)}
 	{@render card('/settings/notifications', 'Notifications', Bell, false, notificationsBody)}
 	{@render card('/settings/widget', 'Widget', LayoutGrid, false, widgetBody)}
+	{@render card('/settings/ai', 'AI', Sparkles, false, aiBody)}
 </div>

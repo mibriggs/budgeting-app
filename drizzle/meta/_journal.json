@@ -120,6 +120,13 @@
       "when": 1795240277314,
       "tag": "0016_quick_add_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1795292204354,
+      "tag": "0017_ai_enabled",
+      "breakpoints": true
     }
   ]
 }

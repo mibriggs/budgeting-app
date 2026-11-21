@@ -9,6 +9,7 @@
 	import CreditCard from '@lucide/svelte/icons/credit-card';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import Repeat from '@lucide/svelte/icons/repeat';
+	import Sparkles from '@lucide/svelte/icons/sparkles';
 	import Tags from '@lucide/svelte/icons/tags';
 	import Wallet from '@lucide/svelte/icons/wallet';
 	import { goto } from '$app/navigation';
@@ -51,7 +52,8 @@
 			href: resolve('/settings/widget'),
 			label: 'Widget',
 			icon: LayoutGrid
-		}
+		},
+		{ id: '/settings/ai', href: resolve('/settings/ai'), label: 'AI', icon: Sparkles }
 	];
 	// Compared by route id: during server rendering resolve() gives relative paths ("./settings"),
 	// which never equal the URL's pathname.

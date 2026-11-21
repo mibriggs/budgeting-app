@@ -15,7 +15,12 @@ import { recentExpenses } from '#lib/server/budget/dashboard.ts';
 import { isActivePaymentMethod, listPaymentMethods } from '#lib/server/budget/payment-methods.ts';
 import { createTransaction } from '#lib/server/budget/transactions.ts';
 import { db } from '#lib/server/db/index.ts';
-import { expense, expenseCategory, pendingExpense } from '#lib/server/db/schema.ts';
+import {
+	expense,
+	expenseCategory,
+	pendingExpense,
+	user as userTable
+} from '#lib/server/db/schema.ts';
 import { notify } from '#lib/server/push.ts';
 import { MAX_NAME_LENGTH, parseAmount, parseDate } from '#lib/transaction-input.ts';
 import { askClaude, modelAvailable } from './claude.ts';
@@ -48,12 +53,14 @@ function allowModelCall(userId: string): boolean {
 	return true;
 }
 
-/** This user's own lists, loaded here so the model only ever sees (and picks from) their data. */
+/** This user's own lists, loaded here so the model only ever sees (and picks from) their data.
+ *  Also whether they've opted in to Claude (Settings → AI), read from the database rather than the
+ *  session so a change applies to the very next reading. */
 async function loadContext(
 	user: User
-): Promise<{ ctx: QuickAddContext; history: HistoryExample[] }> {
+): Promise<{ ctx: QuickAddContext; history: HistoryExample[]; aiEnabled: boolean }> {
 	const today = todayIn(user.timezone ?? undefined);
-	const [categories, methods, recent, past] = await Promise.all([
+	const [categories, methods, recent, past, [account]] = await Promise.all([
 		listActiveCategories(user.id, 'expense'),
 		listPaymentMethods(user.id),
 		recentExpenses(user.id, today, 40),
@@ -63,7 +70,12 @@ async function loadContext(
 			.from(expense)
 			.where(eq(expense.userId, user.id))
 			.orderBy(desc(expense.purchaseDate), desc(expense.createdAt))
-			.limit(HISTORY_ROWS)
+			.limit(HISTORY_ROWS),
+		db
+			.select({ aiEnabled: userTable.aiEnabled })
+			.from(userTable)
+			.where(eq(userTable.id, user.id))
+			.limit(1)
 	]);
 	const pastSeen = new Set<string>();
 	const pastCategories = past.filter(
@@ -87,7 +99,9 @@ async function loadContext(
 			today,
 			history: pastCategories
 		},
-		history
+		history,
+		// No row (shouldn't happen) means no opt-in.
+		aiEnabled: account?.aiEnabled ?? false
 	};
 }
 
@@ -107,7 +121,7 @@ type Reading = {
 type Loaded = Awaited<ReturnType<typeof loadContext>>;
 
 async function read(message: string, user: User, loaded?: Loaded): Promise<Reading> {
-	const { ctx, history } = loaded ?? (await loadContext(user));
+	const { ctx, history, aiEnabled } = loaded ?? (await loadContext(user));
 	const local = parseQuickAdd(message, ctx);
 	const fromParser = (note: string | null): Reading =>
 		local.ok
@@ -135,7 +149,9 @@ async function read(message: string, user: User, loaded?: Loaded): Promise<Readi
 				};
 
 	if (isComplete(local)) return fromParser(null);
-	if (!modelAvailable()) return fromParser(local.ok ? whatsMissing(local) : null);
+	// Claude only for accounts that opted in, and only when the server has an API key. Otherwise
+	// it's the patterns alone, which is the default.
+	if (!aiEnabled || !modelAvailable()) return fromParser(local.ok ? whatsMissing(local) : null);
 	if (!allowModelCall(user.id))
 		return fromParser('Too many readings this hour, so Claude didn’t check this one.');
 

@@ -16,7 +16,8 @@ export const user = sqliteTable('user', {
 		.notNull(),
 	username: text('username'),
 	timezone: text('timezone'),
-	showCreditCards: integer('show_credit_cards', { mode: 'boolean' }).default(true).notNull()
+	showCreditCards: integer('show_credit_cards', { mode: 'boolean' }).default(true).notNull(),
+	aiEnabled: integer('ai_enabled', { mode: 'boolean' }).default(false).notNull()
 });
 
 export const session = sqliteTable(

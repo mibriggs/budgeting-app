@@ -31,7 +31,10 @@ export const auth = betterAuth({
 			timezone: { type: 'string', required: false, input: false },
 			// Home page "Credit Cards" card: shown unless the user hides it (× on the card, or
 			// Settings → Payment Methods). Saved by POST /settings/home-cards.
-			showCreditCards: { type: 'boolean', required: false, defaultValue: true, input: false }
+			showCreditCards: { type: 'boolean', required: false, defaultValue: true, input: false },
+			// Quick add may ask Claude when the patterns can't fill everything in. Off until the user
+			// opts in (Settings → AI); applies to the account on every device. Saved by POST /settings/ai.
+			aiEnabled: { type: 'boolean', required: false, defaultValue: false, input: false }
 		}
 	},
 	databaseHooks: {
