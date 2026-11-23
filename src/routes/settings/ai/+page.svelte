@@ -2,14 +2,16 @@
 	Settings → AI. One switch, saved to the account (every device), off unless the user turns it on:
 	whether Quick add may ask Claude when the built-in patterns can't fill everything in. Greyed
 	out when the server has no Anthropic API key, since Claude can't run there either way. While
-	it's on, shows today's Claude readings against the daily cap (CLAUDE_READINGS_PER_DAY).
+	it's on, shows today's Claude readings against the daily cap (CLAUDE_READINGS_PER_DAY). Below:
+	the Quick add tokens automations use to send to the inbox (QuickAddTokens.svelte).
 -->
 <script lang="ts">
 	import { Switch } from 'bits-ui';
 	import { toast } from 'svelte-sonner';
+	import QuickAddTokens from './QuickAddTokens.svelte';
 	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 
 	// Saved as soon as the switch moves; put back if the save fails.
 	// svelte-ignore state_referenced_locally
@@ -132,4 +134,13 @@
 			Claude” label.
 		</p>
 	</div>
+
+	<QuickAddTokens
+		tokens={data.tokens}
+		origin={data.origin}
+		{form}
+		claudeOn={on}
+		readingsPerDay={data.readings.limit}
+		limits={data.limits}
+	/>
 </section>

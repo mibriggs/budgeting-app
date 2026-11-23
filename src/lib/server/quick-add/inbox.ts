@@ -8,7 +8,12 @@
 import { and, asc, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { Temporal, today as todayIn, type PlainDate } from '#lib/dates.ts';
 import { formatCents } from '#lib/money.ts';
-import { parseQuickAdd, splitMessages, type QuickAddContext } from '#lib/quick-add/parse.ts';
+import {
+	MAX_MESSAGES,
+	parseQuickAdd,
+	splitMessages,
+	type QuickAddContext
+} from '#lib/quick-add/parse.ts';
 import { isComplete, whatsMissing, type HistoryExample } from '#lib/quick-add/prompt.ts';
 import { isActiveCategory, listActiveCategories } from '#lib/server/budget/categories.ts';
 import { recentExpenses } from '#lib/server/budget/dashboard.ts';
@@ -278,21 +283,44 @@ export function summary(item: {
 }
 
 /**
- * Saves a paste to the inbox and reads it. A paste with several alerts or notes becomes one item
- * each (see splitMessages). Returns the stored items. When `pushEndpoint` is given (the device
- * that sent it), that device gets one push when they're all read; the service worker shows it as
- * a toast instead if the app is open there.
+ * Saves a paste to the inbox, one item per alert or note in it (see splitMessages), as
+ * "Reading…". Checks the limits first. Returns the saved items and `read`, which reads them
+ * (patterns, then Claude) and then tells the user's devices with one push for the batch,
+ * whether the items were read or couldn't be. `read` never rejects.
+ *
+ * The app's Quick add awaits `read` and answers with the result. The token route answers right
+ * away and leaves `read` running in the background (waitUntil). Either way, if reading is cut off
+ * partway, the items stay "Reading…" and are read again when the inbox is opened (retryStuck).
+ *
+ * `strict`: refuse a paste with more than MAX_MESSAGES items instead of keeping the first ones
+ * (for automations, which would otherwise never learn the rest were dropped).
  */
-export async function addToInbox(user: User, raw: string, pushEndpoint?: string) {
-	const messages = splitMessages(raw);
-	if (messages.length === 0) return { error: 'The message is empty.' } as const;
+export async function saveToInbox(
+	user: User,
+	raw: string,
+	{ strict = false } = {}
+): Promise<
+	| { error: string; status: 400 | 429 }
+	| { saved: { id: string }[]; read: () => Promise<PendingItem[] | null> }
+> {
+	let messages = splitMessages(raw);
+	if (messages.length === 0) return { error: 'The message is empty.', status: 400 } as const;
+	if (messages.length > MAX_MESSAGES) {
+		if (strict)
+			return {
+				error: `Send at most ${MAX_MESSAGES} items at once; this has ${messages.length}.`,
+				status: 400
+			} as const;
+		messages = messages.slice(0, MAX_MESSAGES);
+	}
 	const [{ total }] = await db
 		.select({ total: count() })
 		.from(pendingExpense)
 		.where(eq(pendingExpense.userId, user.id));
 	if (total + messages.length > MAX_PENDING)
 		return {
-			error: `The inbox holds ${MAX_PENDING} items and has ${total}. Add or dismiss some first.`
+			error: `The inbox holds ${MAX_PENDING} items and has ${total}. Add or dismiss some first.`,
+			status: 400
 		} as const;
 	const tooFast = await recordSend(user.id);
 	if (tooFast) return { error: tooFast, status: 429 } as const;
@@ -302,13 +330,27 @@ export async function addToInbox(user: User, raw: string, pushEndpoint?: string)
 		.insert(pendingExpense)
 		.values(messages.map((message) => ({ userId: user.id, message: message.slice(0, 2000) })))
 		.returning({ id: pendingExpense.id, message: pendingExpense.message });
-	const loaded = await loadContext(user);
-	await Promise.all(rows.map((row) => readAndStore(user, row.id, row.message, loaded)));
 
-	const ids = rows.map((r) => r.id);
-	const items = (await listPending(user.id)).filter((i) => ids.includes(i.id));
-	if (items.length && pushEndpoint) await tellDevice(user.id, items, pushEndpoint);
-	return { items } as const;
+	const read = async (): Promise<PendingItem[] | null> => {
+		const ids = rows.map((r) => r.id);
+		try {
+			const loaded = await loadContext(user);
+			// Each reading catches its own errors (the item is marked failed), so one bad item
+			// doesn't stop the others.
+			await Promise.all(rows.map((row) => readAndStore(user, row.id, row.message, loaded)));
+			const items = (await listPending(user.id)).filter((i) => ids.includes(i.id));
+			// Empty if the user dismissed them all while they were being read.
+			if (items.length) await tellDevices(user.id, items);
+			return items;
+		} catch (error) {
+			// Something outside a single reading broke (the database, most likely). The items are
+			// saved, so say so; they're read again when the inbox is opened.
+			console.error('Quick add: reading the batch failed', error);
+			await tellDevicesStuck(user.id, ids);
+			return null;
+		}
+	};
+	return { saved: rows.map((r) => ({ id: r.id })), read };
 }
 
 async function readAndStore(user: User, id: string, message: string, loaded?: Loaded) {
@@ -336,18 +378,25 @@ async function readAndStore(user: User, id: string, message: string, loaded?: Lo
 	return (await listPending(user.id)).find((i) => i.id === id) ?? null;
 }
 
-/** The toast and push wording for a batch of read items (one push per paste). */
+/** The toast and push wording for a batch of read items (one push per paste). The title says
+ *  whether it worked: ready to review, couldn't be read, or some of each. */
 export function announcement(items: PendingItem[]) {
 	const failed = items.filter((i) => i.status === 'failed').length;
+	const ready = items.length - failed;
 	if (items.length === 1)
 		return {
-			title: failed ? 'Quick add needs a hand' : 'Quick add: ready to review',
+			title: failed ? 'Quick add couldn’t read this' : 'Quick add: ready to review',
 			body: summary(items[0])
 		};
 	const lines = items.slice(0, 3).map((i) => summary(i));
 	if (items.length > 3) lines.push(`and ${items.length - 3} more`);
 	return {
-		title: `Quick add: ${items.length} ready to review`,
+		title:
+			failed === 0
+				? `Quick add: ${items.length} ready to review`
+				: ready === 0
+					? `Quick add couldn’t read ${items.length} items`
+					: `Quick add: ${ready} ready, ${failed} couldn’t be read`,
 		body: lines.join('\n')
 	};
 }
@@ -355,20 +404,40 @@ export function announcement(items: PendingItem[]) {
 /** Identifies a batch of items in a toast or push, so each batch is announced once. */
 export const batchKey = (items: { id: string }[]) => items.map((i) => i.id).join(',');
 
-async function tellDevice(userId: string, items: PendingItem[], endpoint: string) {
+async function tellDevices(userId: string, items: PendingItem[]) {
 	try {
-		await notify(
-			userId,
-			{
-				...announcement(items),
-				url: '/inbox',
-				tag: `quick-add-${items[0].id}`,
-				quickAdd: { id: batchKey(items) }
-			},
-			{ endpoint }
-		);
+		await notify(userId, {
+			...announcement(items),
+			url: '/inbox',
+			tag: `quick-add-${items[0].id}`,
+			quickAdd: { id: batchKey(items) }
+		});
 	} catch (error) {
 		// A failed push isn't worth failing the request over: the items are in the inbox either way.
+		console.error('Quick add: push failed', error);
+	}
+}
+
+/** The toast and push wording when reading the batch broke partway (saved, not read yet). */
+export function stuckAnnouncement(ids: string[]) {
+	return {
+		title: 'Quick add hit a problem',
+		body:
+			ids.length === 1
+				? 'Your item is saved in the inbox but wasn’t read. Open the inbox to read it again.'
+				: `Your ${ids.length} items are saved in the inbox but weren’t read. Open the inbox to read them again.`
+	};
+}
+
+async function tellDevicesStuck(userId: string, ids: string[]) {
+	try {
+		await notify(userId, {
+			...stuckAnnouncement(ids),
+			url: '/inbox',
+			tag: `quick-add-${ids[0]}`,
+			quickAdd: { id: ids.join(',') }
+		});
+	} catch (error) {
 		console.error('Quick add: push failed', error);
 	}
 }

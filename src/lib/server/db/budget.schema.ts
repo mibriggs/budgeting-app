@@ -329,6 +329,9 @@ export const pushSubscription = sqliteTable(
  * open GET /api/widget. Only a SHA-256 hash of each token is stored; the token itself is shown
  * once, when it's made. Deleting a row revokes the token.
  */
+export const TOKEN_SCOPES = ['widget', 'quick-add'] as const;
+export type TokenScope = (typeof TOKEN_SCOPES)[number];
+
 export const apiToken = sqliteTable(
 	'api_token',
 	{
@@ -338,6 +341,9 @@ export const apiToken = sqliteTable(
 			.references(() => user.id, { onDelete: 'cascade' }),
 		/** What the user called it, e.g. "iPhone widget". */
 		name: text('name').notNull(),
+		/** What the token may do, and the one route that accepts it: 'widget' reads this month's
+		 *  numbers (GET /api/widget); 'quick-add' adds to the inbox (POST /api/quick-add). */
+		scope: text('scope', { enum: TOKEN_SCOPES }).notNull().default('widget'),
 		/** Hex SHA-256 of the full token; looked up on every widget request. */
 		tokenHash: text('token_hash').notNull().unique(),
 		/** The token's last 4 characters, so the user can tell tokens apart ("…a1B2"). */
@@ -347,10 +353,11 @@ export const apiToken = sqliteTable(
 		...timestamps
 	},
 	(t) => [
-		index('api_token_user_idx').on(t.userId),
+		index('api_token_user_idx').on(t.userId, t.scope),
 		check('api_token_name_not_blank', notBlank(t.name)),
 		check('api_token_name_length', sql`length(${t.name}) <= 40`),
-		check('api_token_hash_format', sql`length(${t.tokenHash}) = 64`)
+		check('api_token_hash_format', sql`length(${t.tokenHash}) = 64`),
+		check('api_token_scope_valid', sql`${t.scope} IN ('widget', 'quick-add')`)
 	]
 );
 

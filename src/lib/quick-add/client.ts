@@ -3,8 +3,9 @@
 //
 // The sheet closes as soon as sendQuickAdd starts. A "Reading…" toast shows while the server
 // reads it, then turns into the result with a Review button (to /inbox). The server also pushes
-// to this device; if the app is open, the service worker passes that to the page instead of
-// showing a notification, and showQuickAddReady ignores it when the toast is already showing.
+// to every device with notifications on; where the app is open, the service worker passes that
+// to the page instead of showing a notification, and showQuickAddReady ignores it here when the
+// toast is already showing.
 
 import { toast } from 'svelte-sonner';
 import { goto, invalidateAll } from '$app/navigation';
@@ -12,17 +13,6 @@ import { resolve } from '$app/paths';
 
 /** Batches already announced, so the push and the response don't both make a toast. */
 const announced = new Set<string>();
-
-/** This device's push address, if notifications are on here (so only it gets the push). */
-async function pushEndpoint(): Promise<string | undefined> {
-	try {
-		if (!('serviceWorker' in navigator) || !('PushManager' in window)) return undefined;
-		const registration = await navigator.serviceWorker.getRegistration();
-		return (await registration?.pushManager.getSubscription())?.endpoint;
-	} catch {
-		return undefined;
-	}
-}
 
 /** The finished toast: what was read, and Review to open the inbox. Shown once per batch. */
 export function showQuickAddReady(
@@ -53,7 +43,7 @@ export async function sendQuickAdd(message: string) {
 		const response = await fetch('/quick-add', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ message, pushEndpoint: await pushEndpoint() })
+			body: JSON.stringify({ message })
 		});
 		const body = await response.json().catch(() => null);
 		if (!response.ok || !body?.key) {

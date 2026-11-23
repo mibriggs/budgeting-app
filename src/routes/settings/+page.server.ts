@@ -32,7 +32,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 			listActiveCategories(userId, 'expense'),
 			listActiveCategories(userId, 'income'),
 			listDevices(userId),
-			listTokens(userId),
+			listTokens(userId, 'widget'),
 			listPaymentMethods(userId)
 		]);
 

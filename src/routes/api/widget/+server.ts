@@ -56,7 +56,7 @@ const MONTHS = 6;
 const noStore = { 'cache-control': 'no-store' };
 
 export const GET: RequestHandler = async ({ request, url }) => {
-	const userId = await userIdForToken(request.headers.get('authorization'));
+	const userId = await userIdForToken(request.headers.get('authorization'), 'widget');
 	if (!userId)
 		return json(
 			{ error: 'Unauthorized' },

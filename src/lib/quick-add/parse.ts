@@ -326,7 +326,7 @@ const AMOUNT_FIRST = /^\$?\d/;
  * - In a block with bank alerts, a new message starts at each line that opens like an alert
  *   ("Chase …:", "Discover Card Alert:") or starts with an amount; other lines are the previous
  *   message wrapping ("No Action needed.", "See it at https://…") and stay with it.
- * Each message is cleaned; at most MAX_MESSAGES are kept.
+ * Each message is cleaned. Returns them all: callers check the count against MAX_MESSAGES.
  */
 export function splitMessages(text: string): string[] {
 	const messages: string[] = [];
@@ -349,7 +349,7 @@ export function splitMessages(text: string): string[] {
 		}
 		if (current.length) messages.push(current.join(' '));
 	}
-	return messages.map(clean).filter(Boolean).slice(0, MAX_MESSAGES);
+	return messages.map(clean).filter(Boolean);
 }
 
 function fromBankAlert(

@@ -7,7 +7,7 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) redirect(302, '/login');
 	// The scripts call this same site (ORIGIN when set, so production gets its public address).
-	return { tokens: await listTokens(locals.user.id), origin: url.origin };
+	return { tokens: await listTokens(locals.user.id, 'widget'), origin: url.origin };
 };
 
 export const actions: Actions = {
@@ -15,7 +15,11 @@ export const actions: Actions = {
 	create: async ({ locals, request }) => {
 		if (!locals.user) error(401, 'Not signed in');
 		const name = (await request.formData()).get('name');
-		const result = await createToken(locals.user.id, typeof name === 'string' ? name : '');
+		const result = await createToken(
+			locals.user.id,
+			'widget',
+			typeof name === 'string' ? name : ''
+		);
 		if ('error' in result) return fail(400, { error: result.error });
 		return { token: result.token };
 	},
@@ -23,7 +27,7 @@ export const actions: Actions = {
 	revoke: async ({ locals, request }) => {
 		if (!locals.user) error(401, 'Not signed in');
 		const id = (await request.formData()).get('id');
-		if (typeof id !== 'string' || !(await revokeToken(locals.user.id, id)))
+		if (typeof id !== 'string' || !(await revokeToken(locals.user.id, 'widget', id)))
 			return fail(404, { error: 'That token was already revoked.' });
 		return { revoked: true };
 	}
