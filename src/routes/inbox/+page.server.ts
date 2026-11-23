@@ -14,10 +14,12 @@ import {
 import { displayName } from '#lib/server/user.ts';
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, depends }) => {
 	if (!locals.user) {
 		return redirect(302, '/login');
 	}
+	// Refreshed when the app comes back on screen (items may have arrived from an automation).
+	depends('app:inbox');
 	const userId = locals.user.id;
 	// Items whose reading was stopped partway (still "Reading…" after a while) get another go.
 	await retryStuck(locals.user);

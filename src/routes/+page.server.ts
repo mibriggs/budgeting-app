@@ -25,10 +25,12 @@ import type { PageServerLoad } from './login/$types';
 /** How many months the "income vs expenses" chart covers, including this one. */
 const TREND_MONTHS = 6;
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, depends }) => {
 	if (!locals.user) {
 		return redirect(302, '/login');
 	}
+	// The inbox preview: refreshed with the count when the app comes back on screen.
+	depends('app:inbox');
 
 	const userId = locals.user.id;
 	const todayForUser = today(locals.user.timezone ?? undefined);

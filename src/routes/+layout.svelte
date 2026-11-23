@@ -1,7 +1,7 @@
 <script lang="ts">
 	import './layout.css';
 	import { asset } from '$app/paths';
-	import { invalidateAll } from '$app/navigation';
+	import { invalidate, refreshAll } from '$app/navigation';
 	import { online } from 'svelte/reactivity/window';
 	import { Toaster } from 'svelte-sonner';
 	import { showQuickAddReady } from '#lib/quick-add/client.ts';
@@ -37,6 +37,18 @@
 		});
 	});
 
+	// Items can reach the inbox while the app is in the background (an automation using the Quick
+	// add API, or another device), and the push about them then shows as a notification, not here.
+	// When the app comes back on screen, refresh the inbox count and lists (`app:inbox`).
+	$effect(() => {
+		if (!data.signedIn) return;
+		const onVisible = () => {
+			if (document.visibilityState === 'visible') invalidate('app:inbox', true);
+		};
+		document.addEventListener('visibilitychange', onVisible);
+		return () => document.removeEventListener('visibilitychange', onVisible);
+	});
+
 	// Quick add: a push about a finished reading arrives here (from the service worker) when the app
 	// is open and on screen, and shows as a toast instead of a notification. Once per item.
 	$effect(() => {
@@ -67,7 +79,7 @@
 			body: JSON.stringify({ timezone })
 		})
 			.then(async (response) => {
-				if (response.ok) await invalidateAll();
+				if (response.ok) await refreshAll();
 			})
 			.catch(() => {
 				// Offline or failed; try again on the next page load.

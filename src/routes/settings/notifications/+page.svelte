@@ -11,7 +11,7 @@
 	import Send from '@lucide/svelte/icons/send';
 	import Smartphone from '@lucide/svelte/icons/smartphone';
 	import { deserialize } from '$app/forms';
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -81,7 +81,7 @@
 			});
 			const result = deserialize(await response.text());
 			if (result.type === 'success') {
-				await invalidateAll();
+				await refreshAll();
 				return result.data ?? {};
 			}
 			toast.error(

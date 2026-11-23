@@ -8,7 +8,7 @@
 // toast is already showing.
 
 import { toast } from 'svelte-sonner';
-import { goto, invalidateAll } from '$app/navigation';
+import { goto, refreshAll } from '$app/navigation';
 import { resolve } from '$app/paths';
 
 /** Batches already announced, so the push and the response don't both make a toast. */
@@ -30,7 +30,7 @@ export function showQuickAddReady(
 		duration: 10_000,
 		action: { label: 'Review', onClick: () => goto(resolve('/inbox')) }
 	});
-	invalidateAll();
+	refreshAll();
 }
 
 let sending = 0;

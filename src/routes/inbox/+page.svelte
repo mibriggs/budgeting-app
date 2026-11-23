@@ -6,7 +6,7 @@
 <script lang="ts">
 	import Inbox from '@lucide/svelte/icons/inbox';
 	import Zap from '@lucide/svelte/icons/zap';
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 	import AppHeader from '#lib/components/AppHeader.svelte';
 	import QuickAddDialog from '#lib/components/QuickAddDialog.svelte';
 	import PendingCard from './PendingCard.svelte';
@@ -20,7 +20,7 @@
 	const reading = $derived(data.items.some((i) => i.status === 'reading'));
 	$effect(() => {
 		if (!reading) return;
-		const timer = setInterval(() => invalidateAll(), 3000);
+		const timer = setInterval(() => refreshAll(), 3000);
 		return () => clearInterval(timer);
 	});
 </script>

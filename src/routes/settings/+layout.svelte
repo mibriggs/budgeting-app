@@ -64,7 +64,7 @@
 	// menu links straight to Budgets on large screens, so this is only for typed or old links).
 	const large = createMediaQuery(LARGE_SCREEN);
 	$effect(() => {
-		if (onOverview && large.current) goto(resolve('/settings/budgets'), { replaceState: true });
+		if (onOverview && large.current) goto(resolve('/settings/budgets'), { replace: true });
 	});
 </script>
 
