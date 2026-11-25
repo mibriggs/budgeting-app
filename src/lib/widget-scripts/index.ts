@@ -1,4 +1,4 @@
-// The Scriptable scripts offered on Settings → Widget (budget: not listed there yet, in testing). Each is one paste-able file: a short
+// The three Scriptable scripts offered on Settings → Widget (net, top spending, budget). Each is one paste-able file: a short
 // header with the settings the user may change, then common.js, then the widget's own code.
 // The .js files are plain Scriptable code (not modules), imported here as text.
 

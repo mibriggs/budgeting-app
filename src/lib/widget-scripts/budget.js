@@ -3,7 +3,7 @@
 // (budgets don't cover every category), and the top categories by spending, each in a small ring
 // showing how much of its budget is used: 3 on medium, 5 on large with a note each, and what
 // was spent with no budget. Small shows the ring and the month's numbers. The Lock Screen sizes
-// show the same as text. Designed in the /dev/widgets mock (2026-11-25).
+// show the same as text. Design notes: future-plans, "Budget widget" (2026-11-25).
 // Not a module: joined after common.js (see that file).
 
 const result = await load();

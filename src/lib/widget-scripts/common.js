@@ -1,4 +1,4 @@
-// ─── Shared by both CentJar widgets. Nothing to change below this line. ───
+// ─── Shared by all CentJar widgets. Nothing to change below this line. ───
 //
 // Not a module: Settings → Widget joins a short header (TOKEN, BASE_URL, PREVIEW), this file
 // and one widget's file into a single script for Scriptable (https://scriptable.app).

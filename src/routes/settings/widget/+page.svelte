@@ -1,7 +1,8 @@
 <!--
 	Settings → Widget. Tokens for the Home Screen widget (Scriptable): make one, copy it once,
 	revoke ones you don't use. A token can only read this month's numbers from /api/widget.
-	Below: setup steps and the two scripts (net cash flow, top spending) to copy into Scriptable;
+	Below: setup steps and the three scripts (net cash flow, top spending, budget) to copy into
+	Scriptable;
 	right after making a token, the copied script already has it filled in.
 -->
 <script lang="ts">
@@ -11,6 +12,7 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import TrendingUp from '@lucide/svelte/icons/trending-up';
 	import ChartBar from '@lucide/svelte/icons/chart-bar';
+	import ChartPie from '@lucide/svelte/icons/chart-pie';
 	import { toast } from 'svelte-sonner';
 	import { enhance } from '$app/forms';
 	import { TOKEN_NAME_MAX } from '#lib/token-limits.ts';
@@ -47,6 +49,11 @@
 			kind: 'top',
 			icon: ChartBar,
 			about: 'Your 3 biggest categories this month and their share of spending.'
+		},
+		{
+			kind: 'budget',
+			icon: ChartPie,
+			about: 'How much of this month’s budget is used, in rings, with your top categories.'
 		}
 	];
 
