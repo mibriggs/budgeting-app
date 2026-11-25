@@ -19,6 +19,7 @@
 	import { categoryIcon } from '#lib/category-icons.ts';
 	import type { PageProps } from './$types';
 	import type { WidgetData } from './+page.server';
+	import BudgetWidgets from './BudgetWidgets.svelte';
 
 	let { data }: PageProps = $props();
 
@@ -27,7 +28,8 @@
 	let detail = $state<'budget' | 'share'>('share');
 	let layout = $state<'bars' | 'list'>('bars');
 
-	type Status = 'live' | 'offline' | 'error' | 'stale' | 'no-cache' | 'token' | 'empty' | 'few';
+	type Status =
+		'live' | 'offline' | 'error' | 'stale' | 'no-cache' | 'token' | 'empty' | 'some' | 'few';
 	let status = $state<Status>('live');
 	const STATUSES: [Status, string][] = [
 		['live', 'Up to date'],
@@ -37,28 +39,47 @@
 		['no-cache', 'Offline, nothing saved yet'],
 		['token', 'Token revoked or wrong'],
 		['empty', 'New month, nothing spent yet'],
+		['some', 'Three categories so far'],
 		['few', 'Only one category so far']
 	];
 
 	const base: WidgetData = $derived(scenario === 'earned' ? data.earnedMore : data.spentMore);
+	/** Only these categories have spending: totals and shares follow, as the endpoint would. */
+	function onlyThese(categories: WidgetData['topCategories']): WidgetData {
+		const spent = categories.reduce((sum, c) => sum + c.spentCents, 0);
+		const ranked = categories.map((c, i) => ({
+			...c,
+			rank: i + 1,
+			shareOfSpending: spent ? c.spentCents / spent : 0
+		}));
+		return {
+			...base,
+			asOf: categories.length ? base.asOf : '2026-12-01T08:05:00-05:00',
+			topCategories: ranked.slice(0, 3),
+			moreCategories: ranked.slice(3),
+			net: {
+				incomeCents: base.net.incomeCents,
+				expenseCents: spent,
+				netCents: base.net.incomeCents - spent
+			},
+			budget: {
+				limitCents: base.budget.limitCents,
+				spentCents: ranked.reduce((sum, c) => sum + (c.limitCents === null ? 0 : c.spentCents), 0)
+			}
+		};
+	}
+
 	const widget: WidgetData = $derived.by(() => {
 		if (status === 'empty')
 			return {
-				...base,
+				...onlyThese([]),
 				month: '2026-12',
 				monthLabel: 'Dec 2026',
-				topCategories: [],
-				moreCategories: [],
 				net: { incomeCents: 0, expenseCents: 0, netCents: 0 }
 			};
-		if (status === 'few')
-			return {
-				...base,
-				moreCategories: [],
-				topCategories: base.topCategories
-					.slice(1, 2)
-					.map((c) => ({ ...c, rank: 1, shareOfSpending: 1 }))
-			};
+		const all = [...base.topCategories, ...base.moreCategories];
+		if (status === 'some') return onlyThese(all.slice(0, 3));
+		if (status === 'few') return onlyThese(all.slice(1, 2));
 		return base;
 	});
 
@@ -467,6 +488,17 @@
 		)}
 	</div>
 
+	<h2 class="text-sm font-medium text-gray-500">
+		Budget (new, 2026-11-25): one ring for all budgets, then the top categories by spending
+	</h2>
+	<section
+		class={['home flex flex-wrap content-start gap-5 rounded-3xl p-5', theme, notice && 'cached']}
+		aria-label="Budget widgets preview"
+	>
+		<BudgetWidgets {widget} {monthShort} {updated} {problem} {notice} />
+	</section>
+
+	<h2 class="text-sm font-medium text-gray-500">Top spending and net cash flow (built)</h2>
 	<!-- A stand-in for the Home Screen wallpaper. -->
 	<section
 		class={['home flex flex-wrap content-start gap-5 rounded-3xl p-5', theme, notice && 'cached']}

@@ -1,16 +1,18 @@
-// The two Scriptable scripts offered on Settings → Widget. Each is one paste-able file: a short
+// The Scriptable scripts offered on Settings → Widget (budget: not listed there yet, in testing). Each is one paste-able file: a short
 // header with the settings the user may change, then common.js, then the widget's own code.
 // The .js files are plain Scriptable code (not modules), imported here as text.
 
+import budget from './budget.js?raw';
 import common from './common.js?raw';
 import net from './net.js?raw';
 import top from './top.js?raw';
 
-export type WidgetKind = 'net' | 'top';
+export type WidgetKind = 'net' | 'top' | 'budget';
 
 export const WIDGETS: Record<WidgetKind, { title: string; name: string; body: string }> = {
 	net: { title: 'Net cash flow', name: 'CentJar Net', body: net },
-	top: { title: 'Top spending', name: 'CentJar Top Spending', body: top }
+	top: { title: 'Top spending', name: 'CentJar Top Spending', body: top },
+	budget: { title: 'Budget', name: 'CentJar Budget', body: budget }
 };
 
 /**

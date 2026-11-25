@@ -28,6 +28,13 @@ export type WidgetData = {
 	moreCategories: WidgetData['topCategories'];
 	/** The last 6 months, oldest first (this month last), for the large net widget. */
 	months: { month: string; label: string; incomeCents: number; expenseCents: number }[];
+	/**
+	 * Proposed for the Budget widget (2026-11-25): this month's limits added up across every
+	 * category with one (spent or not), and what was spent in those categories. Spending with no
+	 * budget is `net.expenseCents - spentCents`. Per-category limits already come with the
+	 * categories above.
+	 */
+	budget: { limitCents: number; spentCents: number };
 	url: string;
 };
 
@@ -47,9 +54,9 @@ const topCategories: WidgetData['topCategories'] = [
 		name: 'Groceries',
 		sfSymbol: 'cart',
 		icon: 'shopping-cart',
-		spentCents: 35_166,
+		spentCents: 41_266,
 		limitCents: 40_000,
-		leftCents: 4_834,
+		leftCents: -1_266,
 		shareOfSpending: 0.08
 	},
 	{
@@ -103,6 +110,9 @@ const base = {
 	// Like the endpoint: 3 here, ranks 4–7 separately (the 8th sample category isn't sent).
 	topCategories: topCategories.slice(0, 3),
 	moreCategories: topCategories.slice(3, 7),
+	// Budgeted: Rent, Groceries, Gas, Pets, Shopping above, plus Utilities ($250, nothing spent
+	// yet, so not in the lists): why the endpoint sends the sum rather than adding up the lists.
+	budget: { limitCents: 340_000, spentCents: 304_385 },
 	url: 'https://centjar.vercel.app/'
 };
 

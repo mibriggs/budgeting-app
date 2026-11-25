@@ -30,6 +30,12 @@ export type WidgetResponse = {
 	moreCategories: WidgetCategory[];
 	/** The last 6 months including this one, oldest first, for the large net widget. */
 	months: { month: string; label: string; incomeCents: number; expenseCents: number }[];
+	/**
+	 * For the Budget widget: this month's limits added up over every category with one (spent in
+	 * or not), and what was spent in those categories. Spending with no budget is
+	 * `net.expenseCents - budget.spentCents`. Both 0 when no budgets are set.
+	 */
+	budget: { limitCents: number; spentCents: number };
 	/** What tapping the widget opens. */
 	url: string;
 };
@@ -107,6 +113,15 @@ export const GET: RequestHandler = async ({ request, url }) => {
 				return limit === null || limit === undefined ? null : limit - s.cents;
 			})()
 		}));
+	let budgetLimit = 0;
+	let budgetSpent = 0;
+	const spentById = new Map(spending.map((s) => [s.id, s.cents]));
+	for (const b of budgets) {
+		if (b.limitCents === null) continue;
+		budgetLimit += b.limitCents;
+		budgetSpent += spentById.get(b.id) ?? 0;
+	}
+
 	const months = Array.from({ length: MONTHS }, (_, i) => {
 		const m = firstMonth.add({ months: i }).toPlainYearMonth();
 		const key = m.toString();
@@ -126,6 +141,7 @@ export const GET: RequestHandler = async ({ request, url }) => {
 		topCategories: top.slice(0, TOP),
 		moreCategories: top.slice(TOP),
 		months,
+		budget: { limitCents: budgetLimit, spentCents: budgetSpent },
 		url: `${url.origin}/`
 	};
 	return json(body, { headers: noStore });
