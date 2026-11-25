@@ -15,6 +15,20 @@
 	added says that editing it changes only that charge. An archived category or removed payment
 	method the row already has stays pickable for it.
 -->
+<script lang="ts" module>
+	import type { PlainDate as SavedDate } from '#lib/dates.ts';
+	import type { TransactionKind as SavedKind } from '#lib/server/budget/transactions.ts';
+
+	/** What the form just added or saved. `paymentMethodId` is null for income or when not recorded. */
+	export type Saved = {
+		kind: SavedKind;
+		name: string;
+		date: SavedDate;
+		categoryId: string;
+		paymentMethodId: string | null;
+	};
+</script>
+
 <script lang="ts">
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
@@ -62,16 +76,29 @@
 		chooseKind?: boolean;
 		/** Default date: today in the user's time zone. */
 		today: PlainDate;
-		onCreated: (created: { kind: TransactionKind; name: string; date: PlainDate }) => void;
+		/** After adding. Includes the category and payment method so a page can tell whether its
+		 *  filters hide the new row. */
+		onCreated: (created: Saved) => void;
 		/** The row to edit; null (the default) adds a new one instead. */
 		editing?: TransactionRow | null;
 		/** After an edit is saved. */
-		onSaved?: (saved: { kind: TransactionKind; name: string; date: PlainDate }) => void;
+		onSaved?: (saved: Saved) => void;
 		/** After the row being edited is deleted from the form. */
 		onDeleted?: (deleted: { kind: TransactionKind; name: string }) => void;
 	} = $props();
 
 	type Field = 'name' | 'amount' | 'date' | 'categoryId' | 'notes' | 'paymentMethodId';
+
+	/** What was added or saved, for the page's toast. */
+	function saved(): Saved {
+		return {
+			kind,
+			name: name.trim(),
+			date: date ?? today,
+			categoryId,
+			paymentMethodId: kind === 'expense' && paymentMethodId ? paymentMethodId : null
+		};
+	}
 
 	let name = $state('');
 	let amount = $state('');
@@ -228,15 +255,11 @@
 							await update({ reset: false });
 						} else if (result.type === 'success' && editing) {
 							open = false;
-							onSaved?.({ kind, name: name.trim(), date: date ?? today });
+							onSaved?.(saved());
 							await update({ reset: false });
 						} else if (result.type === 'success') {
 							open = false;
-							onCreated({
-								kind,
-								name: name.trim(),
-								date: date ?? today
-							});
+							onCreated(saved());
 							// Stay on the current page (e.g. home) even though the action lives on
 							// /transactions; still reload this page's data.
 							await update({ reset: false, navigate: false });

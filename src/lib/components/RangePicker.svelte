@@ -5,7 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { RANGE_PRESETS, type DateRange, type RangePreset } from '#lib/date-range.ts';
-	import { updateQuery } from '#lib/url.ts';
+	import { shownUrl, updateQuery } from '#lib/url.ts';
 	import { focusCalendarDay } from '#lib/calendar.ts';
 	import { today } from '#lib/dates.ts';
 
@@ -28,7 +28,7 @@
 
 	/** Link to this page with a new range, keeping other query params (like the tab). */
 	function rangeHref(params: { range?: string; from?: string; to?: string }) {
-		const query = updateQuery(page.url.search, {
+		const query = updateQuery(shownUrl(page).search, {
 			range: params.range ?? null,
 			from: params.from ?? null,
 			to: params.to ?? null
