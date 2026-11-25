@@ -410,7 +410,8 @@ async function tellDevices(userId: string, items: PendingItem[]) {
 			...announcement(items),
 			url: '/inbox',
 			tag: `quick-add-${items[0].id}`,
-			quickAdd: { id: batchKey(items) }
+			quickAdd: { id: batchKey(items) },
+			badge: await countPending(userId)
 		});
 	} catch (error) {
 		// A failed push isn't worth failing the request over: the items are in the inbox either way.
@@ -435,7 +436,8 @@ async function tellDevicesStuck(userId: string, ids: string[]) {
 			...stuckAnnouncement(ids),
 			url: '/inbox',
 			tag: `quick-add-${ids[0]}`,
-			quickAdd: { id: ids.join(',') }
+			quickAdd: { id: ids.join(',') },
+			badge: await countPending(userId)
 		});
 	} catch (error) {
 		console.error('Quick add: push failed', error);

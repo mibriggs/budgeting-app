@@ -49,6 +49,17 @@
 		return () => document.removeEventListener('visibilitychange', onVisible);
 	});
 
+	// App icon badge = items waiting in the inbox (installed app; on iPhone, also needs
+	// notification permission). `inboxCount` refreshes on every navigation and when the app comes
+	// back on screen; while it's closed, Quick add pushes update the badge (service worker).
+	$effect(() => {
+		if (!data.signedIn || !('setAppBadge' in navigator)) return;
+		const count = data.inboxCount;
+		(count > 0 ? navigator.setAppBadge(count) : navigator.clearAppBadge()).catch(() => {
+			// Not allowed here (e.g. no notification permission on iPhone): no badge, nothing else.
+		});
+	});
+
 	// Quick add: a push about a finished reading arrives here (from the service worker) when the app
 	// is open and on screen, and shows as a toast instead of a notification. Once per item.
 	$effect(() => {

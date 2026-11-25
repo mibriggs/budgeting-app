@@ -72,6 +72,8 @@ type PushPayload = {
 	tag?: string;
 	/** A Quick add item finished reading (see src/lib/server/quick-add/inbox.ts). */
 	quickAdd?: { id: string };
+	/** The app icon badge: inbox items waiting (0 clears it). */
+	badge?: number;
 };
 
 self.addEventListener('push', (event) => {
@@ -83,6 +85,14 @@ self.addEventListener('push', (event) => {
 	}
 	event.waitUntil(
 		(async () => {
+			// App icon badge, so new inbox items show while the app is closed. Ignored where badges
+			// aren't supported or allowed.
+			if (typeof payload.badge === 'number' && 'setAppBadge' in self.navigator)
+				await (
+					payload.badge > 0
+						? self.navigator.setAppBadge(payload.badge)
+						: self.navigator.clearAppBadge()
+				).catch(() => {});
 			// Quick add: if the app is open and on screen here, the page shows a toast instead (it
 			// may already have, from its own request; it shows each item once). Otherwise, notify.
 			if (payload.quickAdd) {

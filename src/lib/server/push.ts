@@ -33,6 +33,8 @@ export type PushPayload = {
 	/** A Quick add item finished reading. If the app is open and visible on the device, the
 	 *  service worker hands it to the page as a toast instead of showing a notification. */
 	quickAdd?: { id: string };
+	/** Sets the app icon badge (0 clears it): Quick add sends the inbox count. */
+	badge?: number;
 };
 
 // ---------------------------------------------------------------------------
