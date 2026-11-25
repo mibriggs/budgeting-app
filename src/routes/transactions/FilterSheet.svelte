@@ -75,12 +75,16 @@
 		else dragY = 0;
 	}
 
-	function onOpenChange(isOpen: boolean) {
-		if (isOpen) dragY = 0;
+	// Forget the drag once the close animation ends (it slides out from where it was let go).
+	// Resetting on open instead isn't enough: Bits UI's onOpenChange doesn't fire when the page
+	// opens the sheet, so a swipe-closed sheet would reopen pushed down by the old drag.
+	function onoutroend() {
+		dragY = 0;
+		dragging = false;
 	}
 </script>
 
-<Dialog.Root bind:open {onOpenChange}>
+<Dialog.Root bind:open>
 	<Dialog.Portal>
 		<Dialog.Overlay
 			class="fixed inset-0 z-50 bg-black/40"
@@ -88,7 +92,7 @@
 		/>
 		<Dialog.Content
 			forceMount
-			class="fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-2xl border-t border-gray-200 bg-white text-gray-900 shadow-xl outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
+			class="fixed inset-x-0 bottom-0 z-50 flex max-h-[70dvh] flex-col rounded-t-2xl border-t border-gray-200 bg-white text-gray-900 shadow-xl outline-none dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100"
 		>
 			{#snippet child({ props, open: isOpen })}
 				{#if isOpen}
@@ -98,6 +102,7 @@
 						style:transform={dragY ? `translateY(${dragY}px)` : undefined}
 						class={[props.class, !dragging && 'transition-transform duration-200 ease-out']}
 						transition:fly={motion}
+						{onoutroend}
 					>
 						<!-- Drag area: the handle and title bar. Touch/mouse only; keyboard and screen
 						     reader users close it with Escape or the × button. -->
